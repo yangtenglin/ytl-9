@@ -1,4 +1,4 @@
-import type { TripPlan } from '@/types';
+import type { TripPlan, VisaDocument } from '@/types';
 import { generateId } from '@/utils/dateUtils';
 
 const today = new Date();
@@ -6,12 +6,146 @@ const formatDate = (d: Date) => d.toISOString().split('T')[0];
 
 const startDate = new Date(today.getFullYear(), today.getMonth(), today.getDate() + 1);
 
+const addMonths = (d: Date, months: number) => {
+  const result = new Date(d);
+  result.setMonth(result.getMonth() + months);
+  return result;
+};
+
+const addDays = (d: Date, days: number) => {
+  const result = new Date(d);
+  result.setDate(result.getDate() + days);
+  return result;
+};
+
+const mockVisaDocuments: VisaDocument[] = [
+  {
+    id: generateId(),
+    travelerName: '小明',
+    documentType: '护照',
+    documentNumber: 'E12345678',
+    issueDate: formatDate(addMonths(today, -24)),
+    expiryDate: formatDate(addMonths(today, 80)),
+    alertDaysBefore: 180,
+    status: 'approved',
+    uploaded: true,
+    checked: true,
+    uploadFileName: '小明-护照.jpg',
+    note: '护照有效期充足',
+    sortOrder: 0,
+  },
+  {
+    id: generateId(),
+    travelerName: '小明',
+    documentType: '日本签证',
+    documentNumber: 'V9876543210',
+    issueDate: formatDate(addMonths(today, -1)),
+    expiryDate: formatDate(addMonths(today, 2)),
+    alertDaysBefore: 60,
+    status: 'approved',
+    uploaded: true,
+    checked: true,
+    uploadFileName: '小明-日本签证.pdf',
+    note: '单次入境，90天有效期',
+    sortOrder: 1,
+  },
+  {
+    id: generateId(),
+    travelerName: '小明',
+    documentType: '机票行程单',
+    documentNumber: 'CA1234567890',
+    issueDate: formatDate(addDays(today, -7)),
+    expiryDate: formatDate(addDays(startDate, 7)),
+    alertDaysBefore: 30,
+    status: 'approved',
+    uploaded: true,
+    checked: false,
+    uploadFileName: '小明-机票行程单.pdf',
+    note: '往返机票确认单',
+    sortOrder: 2,
+  },
+  {
+    id: generateId(),
+    travelerName: '小明',
+    documentType: '酒店预订单',
+    documentNumber: 'HTL20240615',
+    issueDate: formatDate(addDays(today, -3)),
+    expiryDate: formatDate(addDays(startDate, 6)),
+    alertDaysBefore: 15,
+    status: 'pending',
+    uploaded: false,
+    checked: false,
+    note: '含所有酒店的确认单',
+    sortOrder: 3,
+  },
+  {
+    id: generateId(),
+    travelerName: '小红',
+    documentType: '护照',
+    documentNumber: 'E87654321',
+    issueDate: formatDate(addMonths(today, -36)),
+    expiryDate: formatDate(addDays(today, -5)),
+    alertDaysBefore: 180,
+    status: 'pending',
+    uploaded: false,
+    checked: false,
+    note: '⚠️ 护照已过期，需尽快补办！',
+    sortOrder: 0,
+  },
+  {
+    id: generateId(),
+    travelerName: '小红',
+    documentType: '日本签证',
+    documentNumber: 'V0123456789',
+    issueDate: formatDate(addMonths(today, -1)),
+    expiryDate: formatDate(addDays(today, 10)),
+    alertDaysBefore: 60,
+    status: 'submitted',
+    uploaded: true,
+    checked: false,
+    uploadFileName: '小红-签证受理回执.jpg',
+    note: '签证办理中，预计2周出签',
+    sortOrder: 1,
+  },
+  {
+    id: generateId(),
+    travelerName: '小红',
+    documentType: '机票行程单',
+    documentNumber: 'CA0987654321',
+    issueDate: formatDate(addDays(today, -7)),
+    expiryDate: formatDate(addDays(startDate, 7)),
+    alertDaysBefore: 30,
+    status: 'approved',
+    uploaded: true,
+    checked: true,
+    uploadFileName: '小红-机票行程单.pdf',
+    note: '与小明同班机',
+    sortOrder: 2,
+  },
+  {
+    id: generateId(),
+    travelerName: '小红',
+    documentType: '保险单',
+    documentNumber: 'INS2024JP001',
+    issueDate: formatDate(addDays(today, -1)),
+    expiryDate: formatDate(addDays(startDate, 8)),
+    alertDaysBefore: 15,
+    status: 'approved',
+    uploaded: true,
+    checked: true,
+    uploadFileName: '小红-境外医疗保险.pdf',
+    note: '保额50万，含紧急医疗转运',
+    sortOrder: 3,
+  },
+];
+
 export const mockPlan: TripPlan = {
   id: generateId(),
   name: '关西夏日之旅',
   totalBudget: 15000,
   createdAt: new Date().toISOString(),
   updatedAt: new Date().toISOString(),
+  visaDocuments: mockVisaDocuments,
   items: [
     {
       id: generateId(),

@@ -1,10 +1,10 @@
 import React from 'react';
-import { NotebookPen, FolderOpen, Download, PlusCircle } from 'lucide-react';
+import { NotebookPen, FolderOpen, Download, PlusCircle, FileCheck2 } from 'lucide-react';
 import { useTripStore } from '@/store/useTripStore';
 import { formatCurrency } from '@/utils/costUtils';
 
 export const Header: React.FC = () => {
-  const { currentPlan, setShowPlanModal, exportPlan, addItem, dateRange } = useTripStore();
+  const { currentPlan, setShowPlanModal, setShowVisaModal, exportPlan, addItem, dateRange, visaStats } = useTripStore();
 
   const handleQuickAdd = () => {
     if (!currentPlan || dateRange.length === 0) return;
@@ -51,6 +51,30 @@ export const Header: React.FC = () => {
           <div className="flex items-center gap-2">
             {currentPlan && (
               <>
+                <button
+                  onClick={() => setShowVisaModal(true)}
+                  className={`hidden sm:flex items-center gap-2 ${
+                    visaStats.expiredCount > 0
+                      ? 'btn-danger animate-shake'
+                      : visaStats.warningCount > 0
+                      ? 'bg-tape-yellow/20 text-amber-700 border-2 border-tape-yellow/60 px-4 py-2 rounded-xl shadow-sm hover:shadow-paper transition-all font-medium text-sm'
+                      : 'btn-secondary'
+                  }`}
+                  title="签证材料清单"
+                >
+                  <FileCheck2 size={16} />
+                  签证
+                  {visaStats.expiredCount > 0 && (
+                    <span className="bg-red-500 text-white text-xs px-1.5 py-0.5 rounded-full font-bold">
+                      {visaStats.expiredCount}
+                    </span>
+                  )}
+                  {visaStats.warningCount > 0 && visaStats.expiredCount === 0 && (
+                    <span className="bg-orange-500 text-white text-xs px-1.5 py-0.5 rounded-full font-bold">
+                      {visaStats.warningCount}
+                    </span>
+                  )}
+                </button>
                 <button
                   onClick={handleQuickAdd}
                   className="hidden sm:flex items-center gap-2 btn-secondary"

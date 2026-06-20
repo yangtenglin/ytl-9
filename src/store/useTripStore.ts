@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import type { TripStore, TripItem, TripPlan } from '@/types';
+import type { TripStore, TripItem, TripPlan, VisaDocument, ExpiryAlertLevel } from '@/types';
 import { generateId, getDateRange, isSameDate } from '@/utils/dateUtils';
 import {
   calculateTotal,
@@ -11,11 +11,24 @@ import {
 import { loadFromStorage, saveToStorage, downloadJSON } from '@/utils/storageUtils';
 import { getInitialPlans, getInitialPlanId } from '@/data/mockData';
 
-const storedPlans = loadFromStorage<TripPlan[]>('plans', []);
+const rawStoredPlans = loadFromStorage<TripPlan[]>('plans', []);
 const storedCurrentPlanId = loadFromStorage<string | null>('currentPlanId', null);
+
+const storedPlans = rawStoredPlans.map(plan => ({
+  ...plan,
+  visaDocuments: plan.visaDocuments ?? [],
+}));
 
 const initialPlans = storedPlans.length > 0 ? storedPlans : getInitialPlans();
 const initialPlanId = storedCurrentPlanId || getInitialPlanId();
+
+const getDaysUntil = (dateStr: string): number => {
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const target = new Date(dateStr);
+  target.setHours(0, 0, 0, 0);
+  return Math.ceil((target.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
+};
 
 export const useTripStore = create<TripStore>((set, get) => ({
   currentPlanId: initialPlanId,
@@ -24,6 +37,7 @@ export const useTripStore = create<TripStore>((set, get) => ({
   editingItem: null,
   showSplitModal: false,
   showPlanModal: false,
+  showVisaModal: false,
 
   get currentPlan() {
     return get().plans.find(p => p.id === get().currentPlanId);
@@ -79,6 +93,37 @@ export const useTripStore = create<TripStore>((set, get) => ({
     return uniqueDates;
   },
 
+  get uniqueTravelers() {
+    const plan = get().currentPlan;
+    if (!plan) return [];
+    const travelers = new Set<string>();
+    plan.items.forEach(item => item.participants.forEach(p => travelers.add(p)));
+    plan.visaDocuments?.forEach(doc => travelers.add(doc.travelerName));
+    return [...travelers].filter(Boolean);
+  },
+
+  get visaStats() {
+    const plan = get().currentPlan;
+    if (!plan || !plan.visaDocuments) {
+      return { total: 0, checked: 0, uploaded: 0, expiredCount: 0, warningCount: 0 };
+    }
+    const docs = plan.visaDocuments;
+    let expiredCount = 0;
+    let warningCount = 0;
+    docs.forEach(doc => {
+      const level = get().getExpiryAlertLevel(doc.expiryDate, doc.alertDaysBefore);
+      if (level === 'expired') expiredCount++;
+      if (level === 'danger' || level === 'warning') warningCount++;
+    });
+    return {
+      total: docs.length,
+      checked: docs.filter(d => d.checked).length,
+      uploaded: docs.filter(d => d.uploaded).length,
+      expiredCount,
+      warningCount,
+    };
+  },
+
   setCurrentPlanId: (id) => {
     set({ currentPlanId: id });
     saveToStorage('currentPlanId', id);
@@ -92,12 +137,15 @@ export const useTripStore = create<TripStore>((set, get) => ({
 
   setShowPlanModal: (show) => set({ showPlanModal: show }),
 
+  setShowVisaModal: (show) => set({ showVisaModal: show }),
+
   createPlan: (name, budget) => {
     const newPlan: TripPlan = {
       id: generateId(),
       name,
       totalBudget: budget,
       items: [],
+      visaDocuments: [],
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
     };
@@ -250,6 +298,88 @@ export const useTripStore = create<TripStore>((set, get) => ({
     saveToStorage('plans', get().plans);
   },
 
+  addVisaDocument: (doc) => {
+    const state = get();
+    if (!state.currentPlanId) return;
+
+    const newDoc: VisaDocument = {
+      ...doc,
+      id: generateId(),
+      sortOrder: Date.now(),
+    };
+
+    set((s) => ({
+      plans: s.plans.map(p =>
+        p.id === s.currentPlanId
+          ? {
+              ...p,
+              visaDocuments: [...(p.visaDocuments || []), newDoc],
+              updatedAt: new Date().toISOString(),
+            }
+          : p
+      ),
+    }));
+    saveToStorage('plans', get().plans);
+  },
+
+  updateVisaDocument: (id, updates) => {
+    set((state) => ({
+      plans: state.plans.map(p =>
+        p.id === state.currentPlanId
+          ? {
+              ...p,
+              visaDocuments: (p.visaDocuments || []).map(doc =>
+                doc.id === id ? { ...doc, ...updates } : doc
+              ),
+              updatedAt: new Date().toISOString(),
+            }
+          : p
+      ),
+    }));
+    saveToStorage('plans', get().plans);
+  },
+
+  deleteVisaDocument: (id) => {
+    set((state) => ({
+      plans: state.plans.map(p =>
+        p.id === state.currentPlanId
+          ? {
+              ...p,
+              visaDocuments: (p.visaDocuments || []).filter(doc => doc.id !== id),
+              updatedAt: new Date().toISOString(),
+            }
+          : p
+      ),
+    }));
+    saveToStorage('plans', get().plans);
+  },
+
+  toggleVisaChecked: (id) => {
+    const state = get();
+    const plan = state.currentPlan;
+    if (!plan) return;
+    const doc = (plan.visaDocuments || []).find(d => d.id === id);
+    if (doc) {
+      state.updateVisaDocument(id, { checked: !doc.checked });
+    }
+  },
+
+  getExpiryAlertLevel: (expiryDate, alertDaysBefore) => {
+    const daysUntil = getDaysUntil(expiryDate);
+    if (daysUntil < 0) return 'expired';
+    if (daysUntil <= alertDaysBefore * 0.3) return 'danger';
+    if (daysUntil <= alertDaysBefore) return 'warning';
+    return 'normal';
+  },
+
+  getVisaDocumentsByTraveler: (traveler) => {
+    const plan = get().currentPlan;
+    if (!plan || !plan.visaDocuments) return [];
+    return plan.visaDocuments
+      .filter(d => d.travelerName === traveler)
+      .sort((a, b) => a.sortOrder - b.sortOrder);
+  },
+
   exportPlan: (id) => {
     const plan = get().plans.find(p => p.id === id);
     if (plan) {
@@ -265,6 +395,10 @@ export const useTripStore = create<TripStore>((set, get) => ({
       plan.updatedAt = new Date().toISOString();
       plan.items = plan.items.map(item => ({
         ...item,
+        id: generateId(),
+      }));
+      plan.visaDocuments = (plan.visaDocuments || []).map(doc => ({
+        ...doc,
         id: generateId(),
       }));
       set((state) => ({

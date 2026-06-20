@@ -7,9 +7,10 @@ import { CityFilter } from '@/components/CityFilter';
 import { ItemEditor } from '@/components/ItemEditor';
 import { SplitModal } from '@/components/SplitModal';
 import { PlanManager } from '@/components/PlanManager';
+import { VisaChecklist } from '@/components/VisaChecklist';
 
 export default function App() {
-  const { editingItem, setEditingItem, showSplitModal, showPlanModal, currentPlan } = useTripStore();
+  const { editingItem, setEditingItem, showSplitModal, showPlanModal, showVisaModal, currentPlan } = useTripStore();
 
   return (
     <div className="min-h-screen flex flex-col">
@@ -52,6 +53,8 @@ export default function App() {
       {showSplitModal && <SplitModal />}
 
       {showPlanModal && <PlanManager />}
+
+      {showVisaModal && <VisaChecklist />}
     </div>
   );
 }
