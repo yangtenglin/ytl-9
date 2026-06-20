@@ -1,0 +1,157 @@
+import type { TripPlan } from '@/types';
+import { generateId } from '@/utils/dateUtils';
+
+const today = new Date();
+const formatDate = (d: Date) => d.toISOString().split('T')[0];
+
+const startDate = new Date(today.getFullYear(), today.getMonth(), today.getDate() + 1);
+
+export const mockPlan: TripPlan = {
+  id: generateId(),
+  name: '关西夏日之旅',
+  totalBudget: 15000,
+  createdAt: new Date().toISOString(),
+  updatedAt: new Date().toISOString(),
+  items: [
+    {
+      id: generateId(),
+      title: '上海 → 大阪 机票',
+      type: 'transport',
+      city: '大阪',
+      startDate: formatDate(startDate),
+      endDate: formatDate(startDate),
+      cost: 2800,
+      participants: ['小明', '小红'],
+      note: '往返机票，提前3个月预订优惠',
+      sortOrder: 0,
+    },
+    {
+      id: generateId(),
+      title: '难波华盛顿酒店',
+      type: 'accommodation',
+      city: '大阪',
+      startDate: formatDate(startDate),
+      endDate: formatDate(new Date(startDate.getTime() + 2 * 24 * 60 * 60 * 1000)),
+      cost: 1800,
+      participants: ['小明', '小红'],
+      note: '含早餐，步行5分钟到难波站',
+      sortOrder: 1,
+    },
+    {
+      id: generateId(),
+      title: '道顿堀美食巡礼',
+      type: 'activity',
+      city: '大阪',
+      startDate: formatDate(startDate),
+      endDate: formatDate(startDate),
+      cost: 500,
+      participants: ['小明', '小红'],
+      note: '章鱼烧、大阪烧、蟹道乐',
+      sortOrder: 2,
+    },
+    {
+      id: generateId(),
+      title: '大阪 → 京都 JR',
+      type: 'transport',
+      city: '京都',
+      startDate: formatDate(new Date(startDate.getTime() + 3 * 24 * 60 * 60 * 1000)),
+      endDate: formatDate(new Date(startDate.getTime() + 3 * 24 * 60 * 60 * 1000)),
+      cost: 120,
+      participants: ['小明', '小红'],
+      note: 'JR东海道新干线，约30分钟',
+      sortOrder: 0,
+    },
+    {
+      id: generateId(),
+      title: '清水寺+伏见稻荷',
+      type: 'activity',
+      city: '京都',
+      startDate: formatDate(new Date(startDate.getTime() + 3 * 24 * 60 * 60 * 1000)),
+      endDate: formatDate(new Date(startDate.getTime() + 3 * 24 * 60 * 60 * 1000)),
+      cost: 800,
+      participants: ['小明', '小红'],
+      note: '门票+和服体验',
+      sortOrder: 1,
+    },
+    {
+      id: generateId(),
+      title: '京都祇园日式旅馆',
+      type: 'accommodation',
+      city: '京都',
+      startDate: formatDate(new Date(startDate.getTime() + 3 * 24 * 60 * 60 * 1000)),
+      endDate: formatDate(new Date(startDate.getTime() + 4 * 24 * 60 * 60 * 1000)),
+      cost: 2500,
+      participants: ['小明', '小红'],
+      note: '含怀石料理，传统榻榻米房间',
+      sortOrder: 2,
+    },
+    {
+      id: generateId(),
+      title: '岚山小火车',
+      type: 'activity',
+      city: '京都',
+      startDate: formatDate(new Date(startDate.getTime() + 4 * 24 * 60 * 60 * 1000)),
+      endDate: formatDate(new Date(startDate.getTime() + 4 * 24 * 60 * 60 * 1000)),
+      cost: 400,
+      participants: ['小明', '小红'],
+      note: '保津川游船+小火车',
+      sortOrder: 0,
+    },
+    {
+      id: generateId(),
+      title: '京都 → 东京 新干线',
+      type: 'transport',
+      city: '东京',
+      startDate: formatDate(new Date(startDate.getTime() + 5 * 24 * 60 * 60 * 1000)),
+      endDate: formatDate(new Date(startDate.getTime() + 5 * 24 * 60 * 60 * 1000)),
+      cost: 1400,
+      participants: ['小明', '小红'],
+      note: '希望号，约2.5小时',
+      sortOrder: 0,
+    },
+    {
+      id: generateId(),
+      title: '东京银座酒店',
+      type: 'accommodation',
+      city: '东京',
+      startDate: formatDate(new Date(startDate.getTime() + 5 * 24 * 60 * 60 * 1000)),
+      endDate: formatDate(new Date(startDate.getTime() + 6 * 24 * 60 * 60 * 1000)),
+      cost: 2200,
+      participants: ['小明', '小红'],
+      note: '交通便利，购物方便',
+      sortOrder: 1,
+    },
+    {
+      id: generateId(),
+      title: '东京迪士尼乐园',
+      type: 'activity',
+      city: '东京',
+      startDate: formatDate(new Date(startDate.getTime() + 6 * 24 * 60 * 60 * 1000)),
+      endDate: formatDate(new Date(startDate.getTime() + 6 * 24 * 60 * 60 * 1000)),
+      cost: 1200,
+      participants: ['小明', '小红'],
+      note: '一日票，建议早到',
+      sortOrder: 0,
+    },
+    {
+      id: generateId(),
+      title: '东京 → 上海 机票',
+      type: 'transport',
+      city: '东京',
+      startDate: formatDate(new Date(startDate.getTime() + 7 * 24 * 60 * 60 * 1000)),
+      endDate: formatDate(new Date(startDate.getTime() + 7 * 24 * 60 * 60 * 1000)),
+      cost: 2600,
+      participants: ['小明', '小红'],
+      note: '返程机票，羽田机场出发',
+      sortOrder: 0,
+    },
+  ],
+};
+
+export const getInitialPlans = (): TripPlan[] => {
+  return [mockPlan];
+};
+
+export const getInitialPlanId = (): string => {
+  return mockPlan.id;
+};
