@@ -2,7 +2,7 @@ import React from 'react';
 import { X, Save, Users, CalendarRange, TreeDeciduous, Building, Plus, Trash2, RefreshCw } from 'lucide-react';
 import { useTripStore } from '@/store/useTripStore';
 import type { TripItem, ItemType, BackupPlan } from '@/types';
-import { ITEM_TYPE_LABELS } from '@/types';
+import { ITEM_TYPE_LABELS, BACKUP_PLAN_STATUS_LABELS, BACKUP_PLAN_STATUS_COLORS } from '@/types';
 import { formatDate } from '@/utils/dateUtils';
 import { formatCurrency } from '@/utils/costUtils';
 import { generateId } from '@/utils/dateUtils';
@@ -24,6 +24,8 @@ interface BackupPlanForm {
   type: ItemType;
   cost: string;
   note: string;
+  status: 'pending' | 'adopted' | 'abandoned';
+  reason: string;
 }
 
 export const ItemEditor: React.FC<ItemEditorProps> = ({ item, onClose }) => {
@@ -49,6 +51,8 @@ export const ItemEditor: React.FC<ItemEditorProps> = ({ item, onClose }) => {
       type: b.type,
       cost: String(b.cost),
       note: b.note,
+      status: b.status,
+      reason: b.reason,
     }))
   );
 
@@ -94,6 +98,8 @@ export const ItemEditor: React.FC<ItemEditorProps> = ({ item, onClose }) => {
       type: 'activity',
       cost: '0',
       note: '',
+      status: 'pending',
+      reason: '',
     };
     setBackupPlans(prev => [...prev, newBackup]);
   };
@@ -108,6 +114,12 @@ export const ItemEditor: React.FC<ItemEditorProps> = ({ item, onClose }) => {
     ));
   };
 
+  const handleBackupStatusChange = (id: string, status: 'pending' | 'adopted' | 'abandoned') => {
+    setBackupPlans(prev => prev.map(b =>
+      b.id === id ? { ...b, status } : b
+    ));
+  };
+
   const handleSave = () => {
     const cost = parseFloat(formData.cost) || 0;
     const validBackupPlans: BackupPlan[] = backupPlans
@@ -118,9 +130,11 @@ export const ItemEditor: React.FC<ItemEditorProps> = ({ item, onClose }) => {
         type: b.type,
         cost: parseFloat(b.cost) || 0,
         note: b.note.trim(),
+        status: b.status,
+        reason: b.reason.trim(),
       }));
-    const validBackupIds = validBackupPlans.map(b => b.id);
-    const newActiveBackupId = item.activeBackupId && validBackupIds.includes(item.activeBackupId)
+    const adoptedBackupIds = validBackupPlans.filter(b => b.status === 'adopted').map(b => b.id);
+    const newActiveBackupId = item.activeBackupId && adoptedBackupIds.includes(item.activeBackupId)
       ? item.activeBackupId
       : null;
 
@@ -387,10 +401,15 @@ export const ItemEditor: React.FC<ItemEditorProps> = ({ item, onClose }) => {
                   >
                     <Trash2 size={14} />
                   </button>
-                  <div className="text-xs font-medium text-blue-700 mb-2">
-                    备选方案 {idx + 1}
+                  <div className="flex items-center justify-between mb-2 pr-8">
+                    <div className="text-xs font-medium text-blue-700">
+                      备选方案 {idx + 1}
+                    </div>
+                    <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${BACKUP_PLAN_STATUS_COLORS[backup.status]}`}>
+                      {BACKUP_PLAN_STATUS_LABELS[backup.status]}
+                    </span>
                   </div>
-                  <div className="space-y-2 pr-8">
+                  <div className="space-y-2">
                     <div>
                       <input
                         type="text"
@@ -431,6 +450,35 @@ export const ItemEditor: React.FC<ItemEditorProps> = ({ item, onClose }) => {
                         onChange={(e) => handleBackupChange(backup.id, 'note', e.target.value)}
                         className="w-full px-3 py-1.5 rounded-lg border border-ink-300 bg-paper-50 text-sm focus:border-blue-400 focus:outline-none"
                         placeholder="方案说明（可选）"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-medium text-ink-600 mb-1">审批状态</label>
+                      <div className="flex gap-1">
+                        {(['pending', 'adopted', 'abandoned'] as const).map(status => (
+                          <button
+                            key={status}
+                            type="button"
+                            onClick={() => handleBackupStatusChange(backup.id, status)}
+                            className={`flex-1 py-1.5 px-2 rounded-lg border text-xs font-medium transition-all ${
+                              backup.status === status
+                                ? BACKUP_PLAN_STATUS_COLORS[status]
+                                : 'bg-paper-50 border-ink-200 text-ink-500 hover:border-ink-300'
+                            }`}
+                          >
+                            {BACKUP_PLAN_STATUS_LABELS[status]}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                    <div>
+                      <label className="block text-xs font-medium text-ink-600 mb-1">决策原因</label>
+                      <input
+                        type="text"
+                        value={backup.reason}
+                        onChange={(e) => handleBackupChange(backup.id, 'reason', e.target.value)}
+                        className="w-full px-3 py-1.5 rounded-lg border border-ink-300 bg-paper-50 text-sm focus:border-blue-400 focus:outline-none"
+                        placeholder="说明采用/放弃/待定的原因"
                       />
                     </div>
                   </div>

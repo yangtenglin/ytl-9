@@ -70,8 +70,9 @@ export const ItemCard: React.FC<ItemCardProps> = ({ item, index }) => {
   const riskLevel = getWeatherRiskLevel(item);
   const weatherAffected = isWeatherAffected(item);
   const weather = getWeatherForDate(item.startDate, item.city);
+  const adoptedBackups = item.backupPlans.filter(b => b.status === 'adopted');
   const activeBackup = item.activeBackupId
-    ? item.backupPlans.find(b => b.id === item.activeBackupId)
+    ? adoptedBackups.find(b => b.id === item.activeBackupId)
     : null;
 
   const displayTitle = activeBackup ? activeBackup.title : item.title;
@@ -255,7 +256,7 @@ export const ItemCard: React.FC<ItemCardProps> = ({ item, index }) => {
             </p>
           )}
 
-          {weatherAffected && item.isOutdoor && item.backupPlans.length > 0 && (
+          {weatherAffected && item.isOutdoor && adoptedBackups.length > 0 && (
             <div className="mt-2 pt-2 border-t border-dashed border-ink-500/20">
               <button
                 onClick={(e) => {
@@ -266,7 +267,7 @@ export const ItemCard: React.FC<ItemCardProps> = ({ item, index }) => {
               >
                 <span className="flex items-center gap-1 font-medium">
                   <RefreshCw size={12} />
-                  切换备用方案 ({item.backupPlans.length})
+                  切换备用方案 ({adoptedBackups.length})
                 </span>
                 {showBackupPlans ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
               </button>
@@ -290,7 +291,7 @@ export const ItemCard: React.FC<ItemCardProps> = ({ item, index }) => {
                       <span className="font-mono">{formatCurrency(item.cost)}</span>
                     </div>
                   </button>
-                  {item.backupPlans.map((backup) => (
+                  {adoptedBackups.map((backup) => (
                     <button
                       key={backup.id}
                       onClick={(e) => {

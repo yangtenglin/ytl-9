@@ -36,7 +36,11 @@ const storedPlans = rawStoredPlans.map(plan => ({
   items: plan.items?.map(item => ({
     ...item,
     isOutdoor: item.isOutdoor ?? (item.type === 'activity'),
-    backupPlans: item.backupPlans ?? [],
+    backupPlans: (item.backupPlans ?? []).map(bp => ({
+      ...bp,
+      status: bp.status ?? 'pending',
+      reason: bp.reason ?? '',
+    })),
     activeBackupId: item.activeBackupId ?? null,
   })) ?? [],
 }));
@@ -808,6 +812,8 @@ export const useTripStore = create<TripStore>((set, get) => ({
   addBackupPlan: (itemId, backup) => {
     const newBackup: BackupPlan = {
       ...backup,
+      status: backup.status ?? 'pending',
+      reason: backup.reason ?? '',
       id: generateId(),
     };
     set((state) => ({
@@ -820,6 +826,34 @@ export const useTripStore = create<TripStore>((set, get) => ({
                   ? { ...item, backupPlans: [...item.backupPlans, newBackup] }
                   : item
               ),
+              updatedAt: new Date().toISOString(),
+            }
+          : p
+      ),
+    }));
+    saveToStorage('plans', get().plans);
+  },
+
+  updateBackupPlan: (itemId, backupId, updates) => {
+    set((state) => ({
+      plans: state.plans.map(p =>
+        p.id === state.currentPlanId
+          ? {
+              ...p,
+              items: p.items.map(item => {
+                if (item.id !== itemId) return item;
+                let newActiveBackupId = item.activeBackupId;
+                if (updates.status === 'abandoned' && item.activeBackupId === backupId) {
+                  newActiveBackupId = null;
+                }
+                return {
+                  ...item,
+                  activeBackupId: newActiveBackupId,
+                  backupPlans: item.backupPlans.map(bp =>
+                    bp.id === backupId ? { ...bp, ...updates } : bp
+                  ),
+                };
+              }),
               updatedAt: new Date().toISOString(),
             }
           : p

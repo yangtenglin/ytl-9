@@ -24,12 +24,28 @@ export type WeatherType = 'sunny' | 'cloudy' | 'rainy' | 'stormy' | 'snowy';
 
 export type WeatherRiskLevel = 'safe' | 'caution' | 'danger';
 
+export type BackupPlanStatus = 'pending' | 'adopted' | 'abandoned';
+
+export const BACKUP_PLAN_STATUS_LABELS: Record<BackupPlanStatus, string> = {
+  pending: '待定',
+  adopted: '采用',
+  abandoned: '放弃',
+};
+
+export const BACKUP_PLAN_STATUS_COLORS: Record<BackupPlanStatus, string> = {
+  pending: 'bg-amber-100 text-amber-700 border-amber-300',
+  adopted: 'bg-green-100 text-green-700 border-green-300',
+  abandoned: 'bg-gray-100 text-gray-500 border-gray-300',
+};
+
 export interface BackupPlan {
   id: string;
   title: string;
   type: ItemType;
   cost: number;
   note: string;
+  status: BackupPlanStatus;
+  reason: string;
 }
 
 export interface DailyWeather {
@@ -209,6 +225,7 @@ export interface TripStore {
   deactivateBackupPlan: (itemId: string) => void;
   addBackupPlan: (itemId: string, backup: Omit<BackupPlan, 'id'>) => void;
   removeBackupPlan: (itemId: string, backupId: string) => void;
+  updateBackupPlan: (itemId: string, backupId: string, updates: Partial<BackupPlan>) => void;
   toggleItemOutdoor: (itemId: string) => void;
 }
 
