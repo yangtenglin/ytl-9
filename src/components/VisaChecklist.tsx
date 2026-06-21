@@ -20,6 +20,11 @@ import {
   FileCheck2,
   FileX2,
   Shield,
+  Filter,
+  Layers,
+  SortAsc,
+  SortDesc,
+  Flame,
 } from 'lucide-react';
 import { useTripStore } from '@/store/useTripStore';
 import type { VisaDocument, VisaDocumentStatus, ExpiryAlertLevel } from '@/types';
@@ -536,6 +541,83 @@ export const VisaChecklist: React.FC = () => {
   const [expandedTraveler, setExpandedTraveler] = useState<string | null>(null);
   const [previewFile, setPreviewFile] = useState<{ name: string; data?: string } | null>(null);
 
+  const [viewMode, setViewMode] = useState<'normal' | 'risk'>('normal');
+  const [riskFilterTraveler, setRiskFilterTraveler] = useState<string>('all');
+  const [riskFilterStatus, setRiskFilterStatus] = useState<VisaDocumentStatus | 'all'>('all');
+  const [riskFilterExpiry, setRiskFilterExpiry] = useState<ExpiryAlertLevel | 'all'>('all');
+  const [riskOnlyAbnormal, setRiskOnlyAbnormal] = useState(false);
+  const [riskSortBy, setRiskSortBy] = useState<'expiry' | 'traveler' | 'status'>('expiry');
+  const [riskSortOrder, setRiskSortOrder] = useState<'asc' | 'desc'>('asc');
+
+  const expiryLevelOrder: Record<ExpiryAlertLevel, number> = {
+    expired: 0,
+    danger: 1,
+    warning: 2,
+    normal: 3,
+  };
+
+  const allVisaDocuments = useMemo(() => {
+    const plan = currentPlan;
+    if (!plan || !plan.visaDocuments) return [];
+    return plan.visaDocuments;
+  }, [currentPlan]);
+
+  const riskViewDocuments = useMemo(() => {
+    let docs = [...allVisaDocuments];
+
+    if (riskFilterTraveler !== 'all') {
+      docs = docs.filter(d => d.travelerName === riskFilterTraveler);
+    }
+    if (riskFilterStatus !== 'all') {
+      docs = docs.filter(d => d.status === riskFilterStatus);
+    }
+    if (riskFilterExpiry !== 'all') {
+      docs = docs.filter(d => getExpiryAlertLevel(d.expiryDate, d.alertDaysBefore) === riskFilterExpiry);
+    }
+    if (riskOnlyAbnormal) {
+      docs = docs.filter(d => {
+        const level = getExpiryAlertLevel(d.expiryDate, d.alertDaysBefore);
+        return level === 'expired' || level === 'danger';
+      });
+    }
+
+    docs.sort((a, b) => {
+      let cmp = 0;
+      if (riskSortBy === 'expiry') {
+        const levelA = getExpiryAlertLevel(a.expiryDate, a.alertDaysBefore);
+        const levelB = getExpiryAlertLevel(b.expiryDate, b.alertDaysBefore);
+        cmp = expiryLevelOrder[levelA] - expiryLevelOrder[levelB];
+        if (cmp === 0) {
+          cmp = getDaysUntil(a.expiryDate) - getDaysUntil(b.expiryDate);
+        }
+      } else if (riskSortBy === 'traveler') {
+        cmp = a.travelerName.localeCompare(b.travelerName, 'zh-CN');
+      } else if (riskSortBy === 'status') {
+        const statusOrder: Record<VisaDocumentStatus, number> = {
+          rejected: 0,
+          pending: 1,
+          submitted: 2,
+          approved: 3,
+        };
+        cmp = statusOrder[a.status] - statusOrder[b.status];
+      }
+      return riskSortOrder === 'asc' ? cmp : -cmp;
+    });
+
+    return docs;
+  }, [allVisaDocuments, riskFilterTraveler, riskFilterStatus, riskFilterExpiry, riskOnlyAbnormal, riskSortBy, riskSortOrder, getExpiryAlertLevel]);
+
+  const riskViewStats = useMemo(() => {
+    const docs = riskViewDocuments;
+    const checked = docs.filter(d => d.checked).length;
+    const total = docs.length;
+    const abnormal = docs.filter(d => {
+      const level = getExpiryAlertLevel(d.expiryDate, d.alertDaysBefore);
+      return level === 'expired' || level === 'danger';
+    }).length;
+    return { checked, total, abnormal };
+  }, [riskViewDocuments, getExpiryAlertLevel]);
+
   const handleFileUpload = async (docId: string, file: File) => {
     try {
       let fileData: string | undefined;
@@ -674,7 +756,37 @@ export const VisaChecklist: React.FC = () => {
             </div>
           </div>
 
-          <div className="flex flex-wrap gap-2">
+        <div className="flex flex-wrap gap-2">
+            <div className="flex rounded-xl overflow-hidden border-2 border-ink-500/20">
+              <button
+                onClick={() => setViewMode('normal')}
+                className={`px-3 py-2 text-sm flex items-center gap-1 transition-colors ${
+                  viewMode === 'normal'
+                    ? 'bg-ink-600 text-white'
+                    : 'bg-paper-50 text-ink-500 hover:bg-paper-100'
+                }`}
+              >
+                <User size={14} />
+                旅客视图
+              </button>
+              <button
+                onClick={() => setViewMode('risk')}
+                className={`px-3 py-2 text-sm flex items-center gap-1 transition-colors ${
+                  viewMode === 'risk'
+                    ? 'bg-red-500 text-white'
+                    : 'bg-paper-50 text-ink-500 hover:bg-paper-100'
+                }`}
+              >
+                <Flame size={14} />
+                风险视图
+                {(visaStats.expiredCount > 0 || visaStats.warningCount > 0) && (
+                  <span className="ml-1 px-1.5 py-0.5 rounded-full text-xs bg-red-500/20 text-white">
+                    {visaStats.expiredCount + visaStats.warningCount}
+                  </span>
+                )}
+              </button>
+            </div>
+
             <button
               onClick={() => { setShowAddForm(true); setEditingDoc(null); }}
               className="btn-primary flex items-center gap-2 text-sm py-2"
@@ -725,7 +837,142 @@ export const VisaChecklist: React.FC = () => {
             </div>
           )}
 
-          {uniqueTravelers.length === 0 && visaStats.total === 0 ? (
+          {viewMode === 'risk' && (
+            <div className="card-paper p-4 space-y-3 bg-red-50/30 border-2 border-red-200/60">
+              <div className="flex items-center justify-between flex-wrap gap-3">
+                <h3 className="font-bold text-ink-700 flex items-center gap-2">
+                  <Filter size={16} className="text-red-500" />
+                  风险筛选与排序
+                </h3>
+                <div className="flex items-center gap-2 text-sm">
+                  <span className="text-ink-500">当前显示:</span>
+                  <span className="font-mono font-bold text-red-600">{riskViewStats.total}</span>
+                  <span className="text-ink-500">项</span>
+                  <span className="text-ink-400 mx-1">·</span>
+                  <span className="font-mono font-bold text-green-600">{riskViewStats.checked}/{riskViewStats.total}</span>
+                  <span className="text-ink-500">已确认</span>
+                  {riskViewStats.abnormal > 0 && (
+                    <>
+                      <span className="text-ink-400 mx-1">·</span>
+                      <span className="font-mono font-bold text-red-600 flex items-center gap-1">
+                        <Flame size={12} />
+                        {riskViewStats.abnormal} 异常
+                      </span>
+                    </>
+                  )}
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+                <div>
+                  <label className="block text-xs text-ink-500 mb-1 font-medium flex items-center gap-1">
+                    <User size={11} />
+                    按旅客
+                  </label>
+                  <select
+                    value={riskFilterTraveler}
+                    onChange={(e) => setRiskFilterTraveler(e.target.value)}
+                    className="w-full px-3 py-1.5 rounded-lg border-2 border-ink-500/20 bg-paper-50 text-sm focus:border-ink-500 focus:outline-none transition-colors"
+                  >
+                    <option value="all">全部旅客</option>
+                    {uniqueTravelers.map(t => <option key={t} value={t}>{t}</option>)}
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-xs text-ink-500 mb-1 font-medium flex items-center gap-1">
+                    <FileCheck2 size={11} />
+                    按证件状态
+                  </label>
+                  <select
+                    value={riskFilterStatus}
+                    onChange={(e) => setRiskFilterStatus(e.target.value as VisaDocumentStatus | 'all')}
+                    className="w-full px-3 py-1.5 rounded-lg border-2 border-ink-500/20 bg-paper-50 text-sm focus:border-ink-500 focus:outline-none transition-colors"
+                  >
+                    <option value="all">全部状态</option>
+                    {Object.entries(STATUS_LABELS).map(([k, v]) => (
+                      <option key={k} value={k}>{v}</option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-xs text-ink-500 mb-1 font-medium flex items-center gap-1">
+                    <Clock size={11} />
+                    按到期等级
+                  </label>
+                  <select
+                    value={riskFilterExpiry}
+                    onChange={(e) => setRiskFilterExpiry(e.target.value as ExpiryAlertLevel | 'all')}
+                    className="w-full px-3 py-1.5 rounded-lg border-2 border-ink-500/20 bg-paper-50 text-sm focus:border-ink-500 focus:outline-none transition-colors"
+                  >
+                    <option value="all">全部等级</option>
+                    <option value="expired">已过期</option>
+                    <option value="danger">紧急</option>
+                    <option value="warning">即将到期</option>
+                    <option value="normal">有效</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-xs text-ink-500 mb-1 font-medium flex items-center gap-1">
+                    <SortAsc size={11} />
+                    排序方式
+                  </label>
+                  <div className="flex gap-1">
+                    <select
+                      value={riskSortBy}
+                      onChange={(e) => setRiskSortBy(e.target.value as 'expiry' | 'traveler' | 'status')}
+                      className="flex-1 px-3 py-1.5 rounded-lg border-2 border-ink-500/20 bg-paper-50 text-sm focus:border-ink-500 focus:outline-none transition-colors"
+                    >
+                      <option value="expiry">到期优先级</option>
+                      <option value="traveler">旅客姓名</option>
+                      <option value="status">证件状态</option>
+                    </select>
+                    <button
+                      onClick={() => setRiskSortOrder(o => o === 'asc' ? 'desc' : 'asc')}
+                      className="px-2 py-1.5 rounded-lg border-2 border-ink-500/20 bg-paper-50 hover:bg-paper-100 transition-colors"
+                      title={riskSortOrder === 'asc' ? '升序' : '降序'}
+                    >
+                      {riskSortOrder === 'asc' ? <SortAsc size={16} /> : <SortDesc size={16} />}
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-3 flex-wrap">
+                <button
+                  onClick={() => setRiskOnlyAbnormal(!riskOnlyAbnormal)}
+                  className={`px-4 py-2 rounded-xl text-sm font-bold flex items-center gap-2 transition-all ${
+                    riskOnlyAbnormal
+                      ? 'bg-red-500 text-white shadow-paper scale-105'
+                      : 'bg-red-100/70 text-red-700 border-2 border-red-300 hover:bg-red-100'
+                  }`}
+                >
+                  <Flame size={14} />
+                  {riskOnlyAbnormal ? '查看全部' : '只看异常证件'}
+                  {riskOnlyAbnormal && (
+                    <span className="px-1.5 py-0.5 rounded-full bg-white/20 text-xs">
+                      小红异常
+                    </span>
+                  )}
+                </button>
+
+                {(riskFilterTraveler !== 'all' || riskFilterStatus !== 'all' || riskFilterExpiry !== 'all' || riskOnlyAbnormal) && (
+                  <button
+                    onClick={() => {
+                      setRiskFilterTraveler('all');
+                      setRiskFilterStatus('all');
+                      setRiskFilterExpiry('all');
+                      setRiskOnlyAbnormal(false);
+                    }}
+                    className="px-3 py-2 rounded-xl text-sm text-ink-500 hover:text-ink-700 hover:bg-paper-100 transition-colors"
+                  >
+                    清除所有筛选
+                  </button>
+                )}
+              </div>
+            </div>
+          )}
+
+          {viewMode === 'normal' && uniqueTravelers.length === 0 && visaStats.total === 0 ? (
             <div className="text-center py-12 dashed-border rounded-xl">
               <FileText size={48} className="mx-auto text-ink-300 mb-4" />
               <p className="text-ink-500 mb-4">还没有添加任何签证材料</p>
@@ -737,7 +984,7 @@ export const VisaChecklist: React.FC = () => {
                 添加第一项材料
               </button>
             </div>
-          ) : (
+          ) : viewMode === 'normal' ? (
             uniqueTravelers.map(traveler => (
               <TravelerSection
                 key={traveler}
@@ -754,6 +1001,64 @@ export const VisaChecklist: React.FC = () => {
                 onStatusChange={(id, status) => updateVisaDocument(id, { status })}
               />
             ))
+          ) : riskViewDocuments.length === 0 ? (
+            <div className="text-center py-12 dashed-border rounded-xl">
+              <Layers size={48} className="mx-auto text-ink-300 mb-4" />
+              <p className="text-ink-500 mb-2">当前筛选条件下没有匹配的证件</p>
+              <p className="text-xs text-ink-400 mb-4">尝试调整筛选条件，或添加新的签证材料</p>
+              <button
+                onClick={() => {
+                  setRiskFilterTraveler('all');
+                  setRiskFilterStatus('all');
+                  setRiskFilterExpiry('all');
+                  setRiskOnlyAbnormal(false);
+                }}
+                className="btn-secondary inline-flex items-center gap-2 mr-2"
+              >
+                清除筛选
+              </button>
+              <button
+                onClick={() => { setShowAddForm(true); setEditingDoc(null); }}
+                className="btn-primary inline-flex items-center gap-2"
+              >
+                <Plus size={16} />
+                添加材料
+              </button>
+            </div>
+          ) : (
+            <div className="space-y-3">
+              {riskViewDocuments.map(doc => {
+                const expiryLevel = getExpiryAlertLevel(doc.expiryDate, doc.alertDaysBefore);
+                const isAbnormal = expiryLevel === 'expired' || expiryLevel === 'danger';
+                return (
+                  <div
+                    key={doc.id}
+                    className={`${expiryLevel === 'expired' ? 'order-first' : ''}`}
+                    style={{ order: expiryLevel === 'expired' ? -1 : expiryLevel === 'danger' ? 0 : undefined }}
+                  >
+                    <DocumentCard
+                      doc={doc}
+                      expiryLevel={expiryLevel}
+                      onToggleChecked={() => toggleVisaChecked(doc.id)}
+                      onEdit={() => { setEditingDoc(doc); setShowAddForm(true); }}
+                      onDelete={() => {
+                        if (confirm('确定删除这份材料吗？')) deleteVisaDocument(doc.id);
+                      }}
+                      onUpload={(f) => handleFileUpload(doc.id, f)}
+                      onRemoveUpload={() => handleRemoveUpload(doc.id)}
+                      onViewFile={() => handleViewFile(doc)}
+                      onStatusChange={(s) => updateVisaDocument(doc.id, { status: s })}
+                    />
+                    {isAbnormal && riskOnlyAbnormal && (
+                      <div className="mt-1 ml-8 text-xs text-red-500 flex items-center gap-1">
+                        <Flame size={10} />
+                        异常证件 · 请立即处理
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
           )}
         </div>
       </div>
