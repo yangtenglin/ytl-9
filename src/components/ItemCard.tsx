@@ -1,9 +1,16 @@
 import React from 'react';
 import { useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
-import { Train, Hotel, Ticket, Users, Pencil, Trash2, CalendarDays } from 'lucide-react';
+import { Train, Hotel, Ticket, Users, Pencil, Trash2, CalendarDays, CloudRain, Sun, TreeDeciduous, Building, ChevronDown, ChevronUp, RefreshCw } from 'lucide-react';
 import type { TripItem } from '@/types';
-import { ITEM_TYPE_LABELS, ITEM_TYPE_COLORS } from '@/types';
+import {
+  ITEM_TYPE_LABELS,
+  ITEM_TYPE_COLORS,
+  WEATHER_RISK_LABELS,
+  WEATHER_RISK_COLORS,
+  WEATHER_LABELS,
+  WEATHER_ICONS,
+} from '@/types';
 import { formatShortDate, isCrossDay, getDaysDiff } from '@/utils/dateUtils';
 import { formatCurrency } from '@/utils/costUtils';
 import { useTripStore } from '@/store/useTripStore';
@@ -32,14 +39,44 @@ const typeTextColors = {
   activity: 'text-green-700',
 };
 
+const weatherBorderColors: Record<string, string> = {
+  safe: '',
+  caution: 'ring-2 ring-amber-400 ring-offset-2 ring-offset-paper-100',
+  danger: 'ring-2 ring-red-500 ring-offset-2 ring-offset-paper-100 animate-pulse',
+};
+
 export const ItemCard: React.FC<ItemCardProps> = ({ item, index }) => {
-  const { setEditingItem, deleteItem, getPerPersonCost, selectedCity } = useTripStore();
+  const {
+    setEditingItem,
+    deleteItem,
+    getPerPersonCost,
+    selectedCity,
+    getWeatherRiskLevel,
+    isWeatherAffected,
+    getWeatherForDate,
+    activateBackupPlan,
+    deactivateBackupPlan,
+  } = useTripStore();
+
+  const [showBackupPlans, setShowBackupPlans] = React.useState(false);
+
   const crossDay = isCrossDay(item.startDate, item.endDate);
   const daysCount = getDaysDiff(item.startDate, item.endDate);
   const perPerson = getPerPersonCost(item);
   const hasSplit = item.participants.length > 1;
 
   const isFiltered = selectedCity && item.city !== selectedCity;
+
+  const riskLevel = getWeatherRiskLevel(item);
+  const weatherAffected = isWeatherAffected(item);
+  const weather = getWeatherForDate(item.startDate, item.city);
+  const activeBackup = item.activeBackupId
+    ? item.backupPlans.find(b => b.id === item.activeBackupId)
+    : null;
+
+  const displayTitle = activeBackup ? activeBackup.title : item.title;
+  const displayCost = activeBackup ? activeBackup.cost : item.cost;
+  const displayType = activeBackup ? activeBackup.type : item.type;
 
   const {
     attributes,
@@ -64,8 +101,8 @@ export const ItemCard: React.FC<ItemCardProps> = ({ item, index }) => {
     animationDelay: `${index * 50}ms`,
   };
 
-  const Icon = typeIcons[item.type];
-  const colorClass = ITEM_TYPE_COLORS[item.type];
+  const Icon = typeIcons[displayType];
+  const colorClass = ITEM_TYPE_COLORS[displayType];
 
   const handleEdit = (e: React.MouseEvent) => {
     e.stopPropagation();
@@ -79,6 +116,15 @@ export const ItemCard: React.FC<ItemCardProps> = ({ item, index }) => {
     }
   };
 
+  const handleSelectBackup = (backupId: string) => {
+    if (item.activeBackupId === backupId) {
+      deactivateBackupPlan(item.id);
+    } else {
+      activateBackupPlan(item.id, backupId);
+    }
+    setShowBackupPlans(false);
+  };
+
   return (
     <div
       ref={setNodeRef}
@@ -86,9 +132,10 @@ export const ItemCard: React.FC<ItemCardProps> = ({ item, index }) => {
       className={cn(
         'group relative ticket-style p-3 pr-16 border-2 mb-2 cursor-grab active:cursor-grabbing',
         'hover:shadow-paper-lg transition-all duration-200',
-        typeBgColors[item.type],
+        typeBgColors[displayType],
         isDragging && 'scale-105 shadow-paper-lg z-50',
-        isFiltered && 'pointer-events-none'
+        isFiltered && 'pointer-events-none',
+        weatherBorderColors[riskLevel]
       )}
       {...attributes}
       {...listeners}
@@ -96,16 +143,22 @@ export const ItemCard: React.FC<ItemCardProps> = ({ item, index }) => {
       <div className="flex items-start gap-2">
         <div className={cn(
           'p-1.5 rounded-lg bg-paper-50/80 shadow-sm',
-          typeTextColors[item.type]
+          typeTextColors[displayType]
         )}>
           <Icon size={16} />
         </div>
 
         <div className="flex-1 min-w-0">
-          <div className="flex items-center gap-2 mb-1">
+          <div className="flex items-center gap-2 mb-1 flex-wrap">
             <span className={cn('font-semibold text-sm text-ink-700 truncate')}>
-              {item.title}
+              {displayTitle}
             </span>
+            {activeBackup && (
+              <span className="flex items-center gap-1 text-[10px] bg-blue-100 text-blue-700 border border-blue-300 px-1.5 py-0.5 rounded-full">
+                <RefreshCw size={10} />
+                备选方案
+              </span>
+            )}
             {crossDay && (
               <span className="flex items-center gap-1 text-xs text-ink-500 bg-paper-50/60 px-1.5 py-0.5 rounded">
                 <CalendarDays size={12} />
@@ -114,20 +167,57 @@ export const ItemCard: React.FC<ItemCardProps> = ({ item, index }) => {
             )}
           </div>
 
-          <div className="flex items-center gap-2 text-xs text-ink-500 mb-1.5">
+          <div className="flex items-center gap-2 text-xs text-ink-500 mb-1.5 flex-wrap">
             <span className={cn(
               'font-bold text-[10px] uppercase tracking-wider px-1.5 py-0.5 rounded',
               'bg-paper-50/60',
-              typeTextColors[item.type]
+              typeTextColors[displayType]
             )}>
-              {ITEM_TYPE_LABELS[item.type]}
+              {ITEM_TYPE_LABELS[displayType]}
             </span>
             <span className="truncate">
               {item.city}
             </span>
+            {weather && (
+              <span className="flex items-center gap-1">
+                {WEATHER_ICONS[weather.weather]}
+                {WEATHER_LABELS[weather.weather]}
+                {weather.temperatureLow}°~{weather.temperatureHigh}°
+              </span>
+            )}
             {crossDay && (
               <span className="whitespace-nowrap">
                 {formatShortDate(item.startDate)} → {formatShortDate(item.endDate)}
+              </span>
+            )}
+          </div>
+
+          <div className="flex items-center gap-2 flex-wrap mb-1">
+            {item.isOutdoor && (
+              <span className="flex items-center gap-1 text-[10px] bg-emerald-50 text-emerald-700 border border-emerald-200 px-1.5 py-0.5 rounded-full">
+                <TreeDeciduous size={10} />
+                户外
+              </span>
+            )}
+            {!item.isOutdoor && item.type === 'activity' && (
+              <span className="flex items-center gap-1 text-[10px] bg-slate-50 text-slate-600 border border-slate-200 px-1.5 py-0.5 rounded-full">
+                <Building size={10} />
+                室内
+              </span>
+            )}
+            {weatherAffected && item.isOutdoor && (
+              <span className={cn(
+                'flex items-center gap-1 text-[10px] border px-1.5 py-0.5 rounded-full',
+                WEATHER_RISK_COLORS[riskLevel]
+              )}>
+                <CloudRain size={10} />
+                天气{WEATHER_RISK_LABELS[riskLevel]}
+              </span>
+            )}
+            {!weatherAffected && item.isOutdoor && weather && (weather.weather === 'sunny' || weather.weather === 'cloudy') && (
+              <span className="flex items-center gap-1 text-[10px] bg-yellow-50 text-yellow-700 border border-yellow-200 px-1.5 py-0.5 rounded-full">
+                <Sun size={10} />
+                天气适宜
               </span>
             )}
           </div>
@@ -136,9 +226,14 @@ export const ItemCard: React.FC<ItemCardProps> = ({ item, index }) => {
             <div className="flex items-center gap-3">
               <span className={cn(
                 'font-mono font-bold text-sm',
-                typeTextColors[item.type]
+                typeTextColors[displayType]
               )}>
-                {formatCurrency(item.cost)}
+                {formatCurrency(displayCost)}
+                {activeBackup && activeBackup.cost !== item.cost && (
+                  <span className="ml-1 text-xs line-through opacity-60">
+                    {formatCurrency(item.cost)}
+                  </span>
+                )}
               </span>
               {hasSplit && (
                 <span className="flex items-center gap-1 text-xs text-ink-500">
@@ -149,10 +244,88 @@ export const ItemCard: React.FC<ItemCardProps> = ({ item, index }) => {
             </div>
           </div>
 
-          {item.note && (
+          {activeBackup && (
+            <p className="text-xs text-blue-600 mt-1 pt-1 border-t border-dashed border-blue-500/20 line-clamp-2">
+              💡 备用说明: {activeBackup.note}
+            </p>
+          )}
+          {!activeBackup && item.note && (
             <p className="text-xs text-ink-500 mt-1 pt-1 border-t border-dashed border-ink-500/20 line-clamp-1">
               {item.note}
             </p>
+          )}
+
+          {weatherAffected && item.isOutdoor && item.backupPlans.length > 0 && (
+            <div className="mt-2 pt-2 border-t border-dashed border-ink-500/20">
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setShowBackupPlans(!showBackupPlans);
+                }}
+                className="w-full flex items-center justify-between text-xs text-ink-600 hover:text-ink-800 bg-paper-50/80 hover:bg-paper-100 rounded-lg px-2 py-1.5 transition-colors"
+              >
+                <span className="flex items-center gap-1 font-medium">
+                  <RefreshCw size={12} />
+                  切换备用方案 ({item.backupPlans.length})
+                </span>
+                {showBackupPlans ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
+              </button>
+
+              {showBackupPlans && (
+                <div className="mt-2 space-y-1.5 animate-fade-in-up">
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleSelectBackup('');
+                    }}
+                    className={cn(
+                      'w-full text-left p-2 rounded-lg border-2 text-xs transition-all',
+                      !item.activeBackupId
+                        ? 'bg-green-50 border-green-300 text-green-800'
+                        : 'bg-paper-50 border-ink-200 text-ink-600 hover:border-ink-400'
+                    )}
+                  >
+                    <div className="flex items-center justify-between">
+                      <span className="font-medium">{item.title}（原计划）</span>
+                      <span className="font-mono">{formatCurrency(item.cost)}</span>
+                    </div>
+                  </button>
+                  {item.backupPlans.map((backup) => (
+                    <button
+                      key={backup.id}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleSelectBackup(backup.id);
+                      }}
+                      className={cn(
+                        'w-full text-left p-2 rounded-lg border-2 text-xs transition-all',
+                        item.activeBackupId === backup.id
+                          ? 'bg-blue-50 border-blue-400 text-blue-800'
+                          : 'bg-paper-50 border-ink-200 text-ink-600 hover:border-blue-300 hover:bg-blue-50/50'
+                      )}
+                    >
+                      <div className="flex items-center justify-between mb-1">
+                        <span className="font-medium">{backup.title}</span>
+                        <span className="font-mono">
+                          {formatCurrency(backup.cost)}
+                          {backup.cost !== item.cost && (
+                            <span className={cn(
+                              'ml-1',
+                              backup.cost > item.cost ? 'text-red-500' : 'text-green-600'
+                            )}>
+                              ({backup.cost > item.cost ? '+' : ''}{(backup.cost - item.cost).toFixed(0)})
+                            </span>
+                          )}
+                        </span>
+                      </div>
+                      <p className="text-[11px] opacity-80 line-clamp-1">
+                        {backup.note}
+                      </p>
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
           )}
         </div>
       </div>

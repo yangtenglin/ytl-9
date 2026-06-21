@@ -1,5 +1,18 @@
 import { create } from 'zustand';
-import type { TripStore, TripItem, TripPlan, VisaDocument, ExpiryAlertLevel, PackingList, PackingItem, PriorityLevel } from '@/types';
+import type {
+  TripStore,
+  TripItem,
+  TripPlan,
+  VisaDocument,
+  ExpiryAlertLevel,
+  PackingList,
+  PackingItem,
+  PriorityLevel,
+  DailyWeather,
+  WeatherRiskLevel,
+  BackupPlan,
+  WeatherType,
+} from '@/types';
 import { generateId, getDateRange, isSameDate } from '@/utils/dateUtils';
 import {
   calculateTotal,
@@ -18,10 +31,28 @@ const storedPlans = rawStoredPlans.map(plan => ({
   ...plan,
   visaDocuments: plan.visaDocuments ?? [],
   packingLists: plan.packingLists ?? [],
+  dailyWeather: plan.dailyWeather ?? [],
+  items: plan.items?.map(item => ({
+    ...item,
+    isOutdoor: item.isOutdoor ?? (item.type === 'activity'),
+    backupPlans: item.backupPlans ?? [],
+    activeBackupId: item.activeBackupId ?? null,
+  })) ?? [],
 }));
 
 const initialPlans = storedPlans.length > 0 ? storedPlans : getInitialPlans();
 const initialPlanId = storedCurrentPlanId || getInitialPlanId();
+
+const calculateWeatherRisk = (weather: WeatherType | undefined, isOutdoor: boolean): WeatherRiskLevel => {
+  if (!isOutdoor || !weather) return 'safe';
+  if (weather === 'stormy') return 'danger';
+  if (weather === 'rainy' || weather === 'snowy') return 'caution';
+  return 'safe';
+};
+
+const isBadWeather = (weather: WeatherType | undefined): boolean => {
+  return weather === 'rainy' || weather === 'stormy' || weather === 'snowy';
+};
 
 const getDaysUntil = (dateStr: string): number => {
   const today = new Date();
@@ -169,6 +200,7 @@ export const useTripStore = create<TripStore>((set, get) => ({
       items: [],
       visaDocuments: [],
       packingLists: [],
+      dailyWeather: [],
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
     };
@@ -680,5 +712,144 @@ export const useTripStore = create<TripStore>((set, get) => ({
     const items = get().getItemsByGroup(groupId);
     const convertToGrams = (w: number, unit: 'g' | 'kg') => unit === 'kg' ? w * 1000 : w;
     return items.reduce((sum, i) => sum + convertToGrams(i.weight * i.quantity, i.unit), 0);
+  },
+
+  setDailyWeather: (weather) => {
+    set((state) => {
+      const plan = state.plans.find(p => p.id === state.currentPlanId);
+      if (!plan) return state;
+
+      const existingIndex = plan.dailyWeather.findIndex(
+        w => w.date === weather.date && w.city === weather.city
+      );
+
+      let newWeather: DailyWeather[];
+      if (existingIndex >= 0) {
+        newWeather = [...plan.dailyWeather];
+        newWeather[existingIndex] = weather;
+      } else {
+        newWeather = [...plan.dailyWeather, weather];
+      }
+
+      return {
+        plans: state.plans.map(p =>
+          p.id === state.currentPlanId
+            ? { ...p, dailyWeather: newWeather, updatedAt: new Date().toISOString() }
+            : p
+        ),
+      };
+    });
+    saveToStorage('plans', get().plans);
+  },
+
+  getWeatherForDate: (date, city) => {
+    const plan = get().currentPlan;
+    if (!plan) return undefined;
+    return plan.dailyWeather.find(w => w.date === date && w.city === city);
+  },
+
+  getWeatherRiskLevel: (item) => {
+    const weather = get().getWeatherForDate(item.startDate, item.city);
+    return calculateWeatherRisk(weather?.weather, item.isOutdoor);
+  },
+
+  isWeatherAffected: (item) => {
+    if (!item.isOutdoor) return false;
+    const weather = get().getWeatherForDate(item.startDate, item.city);
+    return isBadWeather(weather?.weather);
+  },
+
+  activateBackupPlan: (itemId, backupId) => {
+    set((state) => ({
+      plans: state.plans.map(p =>
+        p.id === state.currentPlanId
+          ? {
+              ...p,
+              items: p.items.map(item =>
+                item.id === itemId ? { ...item, activeBackupId: backupId } : item
+              ),
+              updatedAt: new Date().toISOString(),
+            }
+          : p
+      ),
+    }));
+    saveToStorage('plans', get().plans);
+  },
+
+  deactivateBackupPlan: (itemId) => {
+    set((state) => ({
+      plans: state.plans.map(p =>
+        p.id === state.currentPlanId
+          ? {
+              ...p,
+              items: p.items.map(item =>
+                item.id === itemId ? { ...item, activeBackupId: null } : item
+              ),
+              updatedAt: new Date().toISOString(),
+            }
+          : p
+      ),
+    }));
+    saveToStorage('plans', get().plans);
+  },
+
+  addBackupPlan: (itemId, backup) => {
+    const newBackup: BackupPlan = {
+      ...backup,
+      id: generateId(),
+    };
+    set((state) => ({
+      plans: state.plans.map(p =>
+        p.id === state.currentPlanId
+          ? {
+              ...p,
+              items: p.items.map(item =>
+                item.id === itemId
+                  ? { ...item, backupPlans: [...item.backupPlans, newBackup] }
+                  : item
+              ),
+              updatedAt: new Date().toISOString(),
+            }
+          : p
+      ),
+    }));
+    saveToStorage('plans', get().plans);
+  },
+
+  removeBackupPlan: (itemId, backupId) => {
+    set((state) => ({
+      plans: state.plans.map(p =>
+        p.id === state.currentPlanId
+          ? {
+              ...p,
+              items: p.items.map(item => {
+                if (item.id !== itemId) return item;
+                const newBackupPlans = item.backupPlans.filter(b => b.id !== backupId);
+                const newActiveBackupId = item.activeBackupId === backupId ? null : item.activeBackupId;
+                return { ...item, backupPlans: newBackupPlans, activeBackupId: newActiveBackupId };
+              }),
+              updatedAt: new Date().toISOString(),
+            }
+          : p
+      ),
+    }));
+    saveToStorage('plans', get().plans);
+  },
+
+  toggleItemOutdoor: (itemId) => {
+    set((state) => ({
+      plans: state.plans.map(p =>
+        p.id === state.currentPlanId
+          ? {
+              ...p,
+              items: p.items.map(item =>
+                item.id === itemId ? { ...item, isOutdoor: !item.isOutdoor } : item
+              ),
+              updatedAt: new Date().toISOString(),
+            }
+          : p
+      ),
+    }));
+    saveToStorage('plans', get().plans);
   },
 }));

@@ -1,9 +1,11 @@
 import React from 'react';
-import { X, Save, Users, CalendarRange } from 'lucide-react';
+import { X, Save, Users, CalendarRange, TreeDeciduous, Building, Plus, Trash2, RefreshCw } from 'lucide-react';
 import { useTripStore } from '@/store/useTripStore';
-import type { TripItem, ItemType } from '@/types';
+import type { TripItem, ItemType, BackupPlan } from '@/types';
 import { ITEM_TYPE_LABELS } from '@/types';
 import { formatDate } from '@/utils/dateUtils';
+import { formatCurrency } from '@/utils/costUtils';
+import { generateId } from '@/utils/dateUtils';
 
 interface ItemEditorProps {
   item: TripItem;
@@ -15,6 +17,14 @@ const typeOptions: { value: ItemType; label: string; color: string }[] = [
   { value: 'accommodation', label: '住宿', color: 'bg-tape-pink/20 border-tape-pink text-pink-700' },
   { value: 'activity', label: '活动', color: 'bg-tape-green/20 border-tape-green text-green-700' },
 ];
+
+interface BackupPlanForm {
+  id: string;
+  title: string;
+  type: ItemType;
+  cost: string;
+  note: string;
+}
 
 export const ItemEditor: React.FC<ItemEditorProps> = ({ item, onClose }) => {
   const { updateItem, setShowSplitModal } = useTripStore();
@@ -29,7 +39,18 @@ export const ItemEditor: React.FC<ItemEditorProps> = ({ item, onClose }) => {
     participants: item.participants,
     isCrossDay: item.startDate !== item.endDate,
     newParticipant: '',
+    isOutdoor: item.isOutdoor,
   });
+
+  const [backupPlans, setBackupPlans] = React.useState<BackupPlanForm[]>(
+    item.backupPlans.map(b => ({
+      id: b.id,
+      title: b.title,
+      type: b.type,
+      cost: String(b.cost),
+      note: b.note,
+    }))
+  );
 
   const handleChange = (field: keyof typeof formData, value: unknown) => {
     setFormData(prev => ({ ...prev, [field]: value }));
@@ -66,8 +87,43 @@ export const ItemEditor: React.FC<ItemEditorProps> = ({ item, onClose }) => {
     }
   };
 
+  const handleAddBackupPlan = () => {
+    const newBackup: BackupPlanForm = {
+      id: generateId(),
+      title: '',
+      type: 'activity',
+      cost: '0',
+      note: '',
+    };
+    setBackupPlans(prev => [...prev, newBackup]);
+  };
+
+  const handleRemoveBackupPlan = (id: string) => {
+    setBackupPlans(prev => prev.filter(b => b.id !== id));
+  };
+
+  const handleBackupChange = (id: string, field: keyof BackupPlanForm, value: string) => {
+    setBackupPlans(prev => prev.map(b =>
+      b.id === id ? { ...b, [field]: value } : b
+    ));
+  };
+
   const handleSave = () => {
     const cost = parseFloat(formData.cost) || 0;
+    const validBackupPlans: BackupPlan[] = backupPlans
+      .filter(b => b.title.trim())
+      .map(b => ({
+        id: b.id,
+        title: b.title.trim(),
+        type: b.type,
+        cost: parseFloat(b.cost) || 0,
+        note: b.note.trim(),
+      }));
+    const validBackupIds = validBackupPlans.map(b => b.id);
+    const newActiveBackupId = item.activeBackupId && validBackupIds.includes(item.activeBackupId)
+      ? item.activeBackupId
+      : null;
+
     updateItem(item.id, {
       title: formData.title,
       type: formData.type,
@@ -77,6 +133,9 @@ export const ItemEditor: React.FC<ItemEditorProps> = ({ item, onClose }) => {
       cost,
       note: formData.note,
       participants: formData.participants,
+      isOutdoor: formData.isOutdoor,
+      backupPlans: validBackupPlans,
+      activeBackupId: newActiveBackupId,
     });
     onClose();
   };
@@ -136,17 +195,48 @@ export const ItemEditor: React.FC<ItemEditorProps> = ({ item, onClose }) => {
             </div>
           </div>
 
-          <div>
-            <label className="block text-sm font-medium text-ink-600 mb-1.5">
-              城市
-            </label>
-            <input
-              type="text"
-              value={formData.city}
-              onChange={(e) => handleChange('city', e.target.value)}
-              className="w-full px-4 py-2 rounded-xl border-2 border-ink-500/20 bg-paper-50 focus:border-ink-500 focus:outline-none transition-colors"
-              placeholder="如：东京、京都、大阪"
-            />
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-medium text-ink-600 mb-1.5">
+                城市
+              </label>
+              <input
+                type="text"
+                value={formData.city}
+                onChange={(e) => handleChange('city', e.target.value)}
+                className="w-full px-4 py-2 rounded-xl border-2 border-ink-500/20 bg-paper-50 focus:border-ink-500 focus:outline-none transition-colors"
+                placeholder="如：东京、京都、大阪"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-ink-600 mb-1.5">
+                活动场景
+              </label>
+              <div className="flex gap-2">
+                <button
+                  onClick={() => handleChange('isOutdoor', true)}
+                  className={`flex-1 py-2 px-3 rounded-xl border-2 font-medium text-sm transition-all flex items-center justify-center gap-1 ${
+                    formData.isOutdoor
+                      ? 'bg-emerald-100 border-emerald-400 text-emerald-800 shadow-paper'
+                      : 'bg-paper-50 border-ink-500/20 text-ink-500 hover:border-ink-500/40'
+                  }`}
+                >
+                  <TreeDeciduous size={14} />
+                  户外
+                </button>
+                <button
+                  onClick={() => handleChange('isOutdoor', false)}
+                  className={`flex-1 py-2 px-3 rounded-xl border-2 font-medium text-sm transition-all flex items-center justify-center gap-1 ${
+                    !formData.isOutdoor
+                      ? 'bg-slate-100 border-slate-400 text-slate-700 shadow-paper'
+                      : 'bg-paper-50 border-ink-500/20 text-ink-500 hover:border-ink-500/40'
+                  }`}
+                >
+                  <Building size={14} />
+                  室内
+                </button>
+              </div>
+            </div>
           </div>
 
           <div className="flex items-center gap-4">
@@ -272,6 +362,88 @@ export const ItemEditor: React.FC<ItemEditorProps> = ({ item, onClose }) => {
                 ))}
               </div>
             )}
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-ink-600 mb-1.5 flex items-center gap-1">
+              <RefreshCw size={14} />
+              备用方案
+              <span className="text-ink-400 text-xs">（雨天备选）</span>
+            </label>
+            {backupPlans.length === 0 && (
+              <div className="text-xs text-ink-400 mb-2">
+                暂无备用方案，下雨时可点击「+ 添加备用方案」来添加室内替代活动
+              </div>
+            )}
+            <div className="space-y-3">
+              {backupPlans.map((backup, idx) => (
+                <div
+                  key={backup.id}
+                  className="p-3 rounded-xl border-2 border-blue-200 bg-blue-50/50 relative"
+                >
+                  <button
+                    onClick={() => handleRemoveBackupPlan(backup.id)}
+                    className="absolute top-2 right-2 p-1 rounded hover:bg-red-100 text-ink-400 hover:text-red-500 transition-colors"
+                  >
+                    <Trash2 size={14} />
+                  </button>
+                  <div className="text-xs font-medium text-blue-700 mb-2">
+                    备选方案 {idx + 1}
+                  </div>
+                  <div className="space-y-2 pr-8">
+                    <div>
+                      <input
+                        type="text"
+                        value={backup.title}
+                        onChange={(e) => handleBackupChange(backup.id, 'title', e.target.value)}
+                        className="w-full px-3 py-1.5 rounded-lg border border-ink-300 bg-paper-50 text-sm focus:border-blue-400 focus:outline-none"
+                        placeholder="备用方案名称"
+                      />
+                    </div>
+                    <div className="grid grid-cols-2 gap-2">
+                      <select
+                        value={backup.type}
+                        onChange={(e) => handleBackupChange(backup.id, 'type', e.target.value)}
+                        className="w-full px-3 py-1.5 rounded-lg border border-ink-300 bg-paper-50 text-sm focus:border-blue-400 focus:outline-none"
+                      >
+                        {typeOptions.map(opt => (
+                          <option key={opt.value} value={opt.value}>
+                            {opt.label}
+                          </option>
+                        ))}
+                      </select>
+                      <div className="relative">
+                        <span className="absolute left-3 top-1/2 -translate-y-1/2 text-ink-400 text-sm">¥</span>
+                        <input
+                          type="number"
+                          value={backup.cost}
+                          onChange={(e) => handleBackupChange(backup.id, 'cost', e.target.value)}
+                          className="w-full pl-7 pr-3 py-1.5 rounded-lg border border-ink-300 bg-paper-50 text-sm font-mono focus:border-blue-400 focus:outline-none"
+                          placeholder="0"
+                          min="0"
+                        />
+                      </div>
+                    </div>
+                    <div>
+                      <input
+                        type="text"
+                        value={backup.note}
+                        onChange={(e) => handleBackupChange(backup.id, 'note', e.target.value)}
+                        className="w-full px-3 py-1.5 rounded-lg border border-ink-300 bg-paper-50 text-sm focus:border-blue-400 focus:outline-none"
+                        placeholder="方案说明（可选）"
+                      />
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+            <button
+              onClick={handleAddBackupPlan}
+              className="w-full mt-2 py-2 rounded-xl border-2 border-dashed border-blue-300 text-blue-600 hover:bg-blue-50 hover:border-blue-400 transition-colors text-sm flex items-center justify-center gap-1"
+            >
+              <Plus size={16} />
+              添加备用方案
+            </button>
           </div>
 
           <div>

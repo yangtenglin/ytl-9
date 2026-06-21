@@ -6,6 +6,28 @@ export type ExpiryAlertLevel = 'normal' | 'warning' | 'danger' | 'expired';
 
 export type PriorityLevel = 'must' | 'important' | 'optional';
 
+export type WeatherType = 'sunny' | 'cloudy' | 'rainy' | 'stormy' | 'snowy';
+
+export type WeatherRiskLevel = 'safe' | 'caution' | 'danger';
+
+export interface BackupPlan {
+  id: string;
+  title: string;
+  type: ItemType;
+  cost: number;
+  note: string;
+}
+
+export interface DailyWeather {
+  date: string;
+  city: string;
+  weather: WeatherType;
+  temperatureHigh: number;
+  temperatureLow: number;
+  precipitationProbability: number;
+  windSpeed: number;
+}
+
 export interface PackingGroup {
   id: string;
   name: string;
@@ -66,6 +88,9 @@ export interface TripItem {
   participants: string[];
   note: string;
   sortOrder: number;
+  isOutdoor: boolean;
+  backupPlans: BackupPlan[];
+  activeBackupId: string | null;
 }
 
 export interface TripPlan {
@@ -75,6 +100,7 @@ export interface TripPlan {
   items: TripItem[];
   visaDocuments: VisaDocument[];
   packingLists: PackingList[];
+  dailyWeather: DailyWeather[];
   createdAt: string;
   updatedAt: string;
 }
@@ -151,6 +177,15 @@ export interface TripStore {
   togglePackingItem: (id: string) => void;
   getItemsByGroup: (groupId: string) => PackingItem[];
   calculateGroupWeight: (groupId: string) => number;
+  setDailyWeather: (weather: DailyWeather) => void;
+  getWeatherForDate: (date: string, city: string) => DailyWeather | undefined;
+  getWeatherRiskLevel: (item: TripItem) => WeatherRiskLevel;
+  isWeatherAffected: (item: TripItem) => boolean;
+  activateBackupPlan: (itemId: string, backupId: string) => void;
+  deactivateBackupPlan: (itemId: string) => void;
+  addBackupPlan: (itemId: string, backup: Omit<BackupPlan, 'id'>) => void;
+  removeBackupPlan: (itemId: string, backupId: string) => void;
+  toggleItemOutdoor: (itemId: string) => void;
 }
 
 export const PRIORITY_LABELS: Record<PriorityLevel, string> = {
@@ -183,4 +218,32 @@ export const ITEM_TYPE_COLORS: Record<ItemType, string> = {
   transport: 'tape-orange',
   accommodation: 'tape-pink',
   activity: 'tape-green',
+};
+
+export const WEATHER_LABELS: Record<WeatherType, string> = {
+  sunny: '晴',
+  cloudy: '多云',
+  rainy: '雨',
+  stormy: '暴雨',
+  snowy: '雪',
+};
+
+export const WEATHER_ICONS: Record<WeatherType, string> = {
+  sunny: '☀️',
+  cloudy: '⛅',
+  rainy: '🌧️',
+  stormy: '⛈️',
+  snowy: '❄️',
+};
+
+export const WEATHER_RISK_LABELS: Record<WeatherRiskLevel, string> = {
+  safe: '正常',
+  caution: '注意',
+  danger: '风险',
+};
+
+export const WEATHER_RISK_COLORS: Record<WeatherRiskLevel, string> = {
+  safe: 'bg-green-100 text-green-700 border-green-300',
+  caution: 'bg-amber-100 text-amber-700 border-amber-300',
+  danger: 'bg-red-100 text-red-700 border-red-300',
 };

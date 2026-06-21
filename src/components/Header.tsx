@@ -18,6 +18,9 @@ export const Header: React.FC = () => {
       cost: 0,
       participants: [],
       note: '',
+      isOutdoor: true,
+      backupPlans: [],
+      activeBackupId: null,
     });
   };
 
