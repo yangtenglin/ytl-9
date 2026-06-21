@@ -8,6 +8,7 @@ import type {
   PackingList,
   PackingItem,
   PriorityLevel,
+  BagSlot,
   DailyWeather,
   WeatherRiskLevel,
   BackupPlan,
@@ -160,10 +161,13 @@ export const useTripStore = create<TripStore>((set, get) => ({
   get packingStats() {
     const plan = get().currentPlan;
     if (!plan || !plan.packingLists || plan.packingLists.length === 0) {
-      return { totalItems: 0, packedItems: 0, totalWeight: 0, maxWeight: 0, isOverWeight: false, weightPercent: 0, mustUnpacked: 0 };
+      return { totalItems: 0, packedItems: 0, totalWeight: 0, maxWeight: 0, isOverWeight: false, weightPercent: 0, mustUnpacked: 0, carryOnWeight: 0, carryOnLimit: 0, carryOnOverWeight: false, checkedWeight: 0, checkedLimit: 0, checkedOverWeight: false, hotelStorageWeight: 0 };
     }
     const packingList = plan.packingLists[0];
-    const items = packingList.items;
+    const items = packingList.items.map(i => ({
+      ...i,
+      bagSlot: (i.bagSlot || 'checked') as BagSlot,
+    }));
     const totalItems = items.length;
     const packedItems = items.filter(i => i.packed).length;
     const convertToGrams = (w: number, unit: 'g' | 'kg') => unit === 'kg' ? w * 1000 : w;
@@ -172,7 +176,14 @@ export const useTripStore = create<TripStore>((set, get) => ({
     const isOverWeight = totalWeight > maxWeight;
     const weightPercent = maxWeight > 0 ? Math.min(100, (totalWeight / maxWeight) * 100) : 0;
     const mustUnpacked = items.filter(i => i.priority === 'must' && !i.packed).length;
-    return { totalItems, packedItems, totalWeight, maxWeight, isOverWeight, weightPercent, mustUnpacked };
+    const carryOnWeight = items.filter(i => i.bagSlot === 'carry-on').reduce((sum, i) => sum + convertToGrams(i.weight * i.quantity, i.unit), 0);
+    const carryOnLimit = convertToGrams(packingList.carryOnLimit ?? 7, 'kg');
+    const carryOnOverWeight = carryOnWeight > carryOnLimit;
+    const checkedWeight = items.filter(i => i.bagSlot === 'checked').reduce((sum, i) => sum + convertToGrams(i.weight * i.quantity, i.unit), 0);
+    const checkedLimit = convertToGrams(packingList.checkedLimit ?? 20, 'kg');
+    const checkedOverWeight = checkedWeight > checkedLimit;
+    const hotelStorageWeight = items.filter(i => i.bagSlot === 'hotel-storage').reduce((sum, i) => sum + convertToGrams(i.weight * i.quantity, i.unit), 0);
+    return { totalItems, packedItems, totalWeight, maxWeight, isOverWeight, weightPercent, mustUnpacked, carryOnWeight, carryOnLimit, carryOnOverWeight, checkedWeight, checkedLimit, checkedOverWeight, hotelStorageWeight };
   },
 
   setCurrentPlanId: (id) => {
@@ -489,10 +500,10 @@ export const useTripStore = create<TripStore>((set, get) => ({
     return plan.packingLists[0];
   },
 
-  createPackingList: (name, maxWeight, maxWeightUnit) => {
+  createPackingList: (name, maxWeight, maxWeightUnit, carryOnLimit, checkedLimit) => {
     const state = get();
     if (!state.currentPlanId) return;
-    const newPackingList = createInitialPackingList(state.currentPlanId, name, maxWeight, maxWeightUnit);
+    const newPackingList = createInitialPackingList(state.currentPlanId, name, maxWeight, maxWeightUnit, carryOnLimit, checkedLimit);
     set((s) => ({
       plans: s.plans.map(p =>
         p.id === s.currentPlanId
@@ -533,7 +544,7 @@ export const useTripStore = create<TripStore>((set, get) => ({
     if (!plan) return;
 
     if (!plan.packingLists || plan.packingLists.length === 0) {
-      state.createPackingList('行李清单', 20, 'kg');
+      state.createPackingList('行李清单', 20, 'kg', 7, 20);
     }
 
     set((s) => ({
@@ -616,7 +627,7 @@ export const useTripStore = create<TripStore>((set, get) => ({
     if (!plan) return;
 
     if (!plan.packingLists || plan.packingLists.length === 0) {
-      state.createPackingList('行李清单', 20, 'kg');
+      state.createPackingList('行李清单', 20, 'kg', 7, 20);
     }
 
     set((s) => ({
@@ -625,6 +636,7 @@ export const useTripStore = create<TripStore>((set, get) => ({
         const pl = p.packingLists[0];
         const newItem: PackingItem = {
           ...item,
+          bagSlot: item.bagSlot || 'checked',
           id: generateId(),
           sortOrder: pl.items.length,
         };

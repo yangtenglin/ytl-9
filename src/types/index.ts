@@ -6,6 +6,20 @@ export type ExpiryAlertLevel = 'normal' | 'warning' | 'danger' | 'expired';
 
 export type PriorityLevel = 'must' | 'important' | 'optional';
 
+export type BagSlot = 'carry-on' | 'checked' | 'hotel-storage';
+
+export const BAG_SLOT_LABELS: Record<BagSlot, string> = {
+  'carry-on': '随身包',
+  'checked': '托运行李',
+  'hotel-storage': '酒店寄存',
+};
+
+export const BAG_SLOT_COLORS: Record<BagSlot, string> = {
+  'carry-on': 'bg-tape-blue/15 text-blue-700 border-tape-blue/40',
+  'checked': 'bg-tape-orange/15 text-orange-700 border-tape-orange/40',
+  'hotel-storage': 'bg-tape-green/15 text-green-700 border-tape-green/40',
+};
+
 export type WeatherType = 'sunny' | 'cloudy' | 'rainy' | 'stormy' | 'snowy';
 
 export type WeatherRiskLevel = 'safe' | 'caution' | 'danger';
@@ -43,6 +57,7 @@ export interface PackingItem {
   unit: 'g' | 'kg';
   priority: PriorityLevel;
   groupId: string;
+  bagSlot: BagSlot;
   packed: boolean;
   note: string;
   sortOrder: number;
@@ -54,6 +69,8 @@ export interface PackingList {
   name: string;
   maxWeight: number;
   maxWeightUnit: 'g' | 'kg';
+  carryOnLimit: number;
+  checkedLimit: number;
   groups: PackingGroup[];
   items: PackingItem[];
   createdAt: string;
@@ -139,6 +156,13 @@ export interface TripStore {
     isOverWeight: boolean;
     weightPercent: number;
     mustUnpacked: number;
+    carryOnWeight: number;
+    carryOnLimit: number;
+    carryOnOverWeight: boolean;
+    checkedWeight: number;
+    checkedLimit: number;
+    checkedOverWeight: boolean;
+    hotelStorageWeight: number;
   };
   setCurrentPlanId: (id: string | null) => void;
   setSelectedCity: (city: string | null) => void;
@@ -166,7 +190,7 @@ export interface TripStore {
   getItemsByDate: (date: string) => TripItem[];
   getPerPersonCost: (item: TripItem) => number;
   getCurrentPackingList: () => PackingList | null;
-  createPackingList: (name: string, maxWeight: number, maxWeightUnit: 'g' | 'kg') => void;
+  createPackingList: (name: string, maxWeight: number, maxWeightUnit: 'g' | 'kg', carryOnLimit?: number, checkedLimit?: number) => void;
   updatePackingList: (updates: Partial<Omit<PackingList, 'id' | 'planId' | 'createdAt'>>) => void;
   addPackingGroup: (name: string, color?: string) => void;
   updatePackingGroup: (id: string, updates: Partial<Omit<PackingGroup, 'id' | 'sortOrder'>>) => void;

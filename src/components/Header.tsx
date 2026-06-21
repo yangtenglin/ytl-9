@@ -6,6 +6,8 @@ import { formatCurrency } from '@/utils/costUtils';
 export const Header: React.FC = () => {
   const { currentPlan, setShowPlanModal, setShowVisaModal, setShowPackingModal, exportPlan, addItem, dateRange, visaStats, packingStats } = useTripStore();
 
+  const anyBagOverWeight = packingStats.isOverWeight || packingStats.carryOnOverWeight || packingStats.checkedOverWeight;
+
   const handleQuickAdd = () => {
     if (!currentPlan || dateRange.length === 0) return;
     const firstDate = dateRange[0];
@@ -56,8 +58,8 @@ export const Header: React.FC = () => {
               <>
                 <button
                   onClick={() => setShowPackingModal(true)}
-                  className={`hidden sm:flex items-center gap-2 ${
-                    packingStats.isOverWeight
+                  className={`flex items-center gap-2 ${
+                    anyBagOverWeight
                       ? 'btn-danger animate-shake'
                       : packingStats.mustUnpacked > 0
                       ? 'bg-tape-yellow/20 text-amber-700 border-2 border-tape-yellow/60 px-4 py-2 rounded-xl shadow-sm hover:shadow-paper transition-all font-medium text-sm'
@@ -66,13 +68,13 @@ export const Header: React.FC = () => {
                   title="行李打包清单"
                 >
                   <Package size={16} />
-                  行李
-                  {packingStats.isOverWeight && (
+                  <span className="hidden sm:inline">行李</span>
+                  {anyBagOverWeight && (
                     <span className="bg-red-500 text-white text-xs px-1.5 py-0.5 rounded-full font-bold">
                       超重
                     </span>
                   )}
-                  {packingStats.mustUnpacked > 0 && !packingStats.isOverWeight && (
+                  {packingStats.mustUnpacked > 0 && !anyBagOverWeight && (
                     <span className="bg-orange-500 text-white text-xs px-1.5 py-0.5 rounded-full font-bold">
                       {packingStats.mustUnpacked}
                     </span>
@@ -80,7 +82,7 @@ export const Header: React.FC = () => {
                 </button>
                 <button
                   onClick={() => setShowVisaModal(true)}
-                  className={`hidden sm:flex items-center gap-2 ${
+                  className={`flex items-center gap-2 ${
                     visaStats.expiredCount > 0
                       ? 'btn-danger animate-shake'
                       : visaStats.warningCount > 0
@@ -90,7 +92,7 @@ export const Header: React.FC = () => {
                   title="签证材料清单"
                 >
                   <FileCheck2 size={16} />
-                  签证
+                  <span className="hidden sm:inline">签证</span>
                   {visaStats.expiredCount > 0 && (
                     <span className="bg-red-500 text-white text-xs px-1.5 py-0.5 rounded-full font-bold">
                       {visaStats.expiredCount}
@@ -104,19 +106,19 @@ export const Header: React.FC = () => {
                 </button>
                 <button
                   onClick={handleQuickAdd}
-                  className="hidden sm:flex items-center gap-2 btn-secondary"
+                  className="flex items-center gap-2 btn-secondary"
                   title="快速添加项目"
                 >
                   <PlusCircle size={16} />
-                  添加
+                  <span className="hidden sm:inline">添加</span>
                 </button>
                 <button
                   onClick={() => exportPlan(currentPlan.id)}
-                  className="hidden sm:flex items-center gap-2 btn-secondary"
+                  className="flex items-center gap-2 btn-secondary"
                   title="导出方案"
                 >
                   <Download size={16} />
-                  导出
+                  <span className="hidden sm:inline">导出</span>
                 </button>
               </>
             )}

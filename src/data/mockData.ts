@@ -1,4 +1,4 @@
-import type { TripPlan, VisaDocument, PackingList, DailyWeather } from '@/types';
+import type { TripPlan, VisaDocument, PackingList, DailyWeather, BagSlot } from '@/types';
 import { generateId } from '@/utils/dateUtils';
 import { DEFAULT_PACKING_GROUPS } from '@/types';
 
@@ -444,7 +444,9 @@ export const createInitialPackingList = (
   planId: string,
   name: string,
   maxWeight: number,
-  maxWeightUnit: 'g' | 'kg'
+  maxWeightUnit: 'g' | 'kg',
+  carryOnLimit: number = 7,
+  checkedLimit: number = 20,
 ): PackingList => {
   const groups = DEFAULT_PACKING_GROUPS.map((g, idx) => ({
     id: generateId(),
@@ -454,28 +456,28 @@ export const createInitialPackingList = (
   }));
 
   const items = [
-    { id: generateId(), name: '护照', quantity: 2, weight: 100, unit: 'g' as const, priority: 'must' as const, groupId: groups[0].id, packed: false, note: '每人一本', sortOrder: 0 },
-    { id: generateId(), name: '日本签证', quantity: 2, weight: 20, unit: 'g' as const, priority: 'must' as const, groupId: groups[0].id, packed: false, note: '打印的在留卡', sortOrder: 1 },
-    { id: generateId(), name: '机票行程单', quantity: 2, weight: 50, unit: 'g' as const, priority: 'must' as const, groupId: groups[0].id, packed: false, note: '电子版+纸质版', sortOrder: 2 },
-    { id: generateId(), name: '身份证', quantity: 2, weight: 20, unit: 'g' as const, priority: 'important' as const, groupId: groups[0].id, packed: false, note: '', sortOrder: 3 },
-    { id: generateId(), name: '短袖T恤', quantity: 8, weight: 200, unit: 'g' as const, priority: 'important' as const, groupId: groups[1].id, packed: false, note: '每人4件', sortOrder: 0 },
-    { id: generateId(), name: '内衣裤', quantity: 10, weight: 80, unit: 'g' as const, priority: 'important' as const, groupId: groups[1].id, packed: false, note: '', sortOrder: 1 },
-    { id: generateId(), name: '薄外套', quantity: 2, weight: 400, unit: 'g' as const, priority: 'optional' as const, groupId: groups[1].id, packed: false, note: '空调房用', sortOrder: 2 },
-    { id: generateId(), name: '轻便运动鞋', quantity: 2, weight: 500, unit: 'g' as const, priority: 'must' as const, groupId: groups[1].id, packed: false, note: '舒适为主', sortOrder: 3 },
-    { id: generateId(), name: '拖鞋', quantity: 2, weight: 300, unit: 'g' as const, priority: 'optional' as const, groupId: groups[1].id, packed: false, note: '酒店穿', sortOrder: 4 },
-    { id: generateId(), name: '手机', quantity: 2, weight: 200, unit: 'g' as const, priority: 'must' as const, groupId: groups[2].id, packed: false, note: '', sortOrder: 0 },
-    { id: generateId(), name: '充电宝', quantity: 1, weight: 200, unit: 'g' as const, priority: 'must' as const, groupId: groups[2].id, packed: false, note: '小于100Wh', sortOrder: 1 },
-    { id: generateId(), name: '充电器', quantity: 2, weight: 100, unit: 'g' as const, priority: 'must' as const, groupId: groups[2].id, packed: false, note: 'Type-C', sortOrder: 2 },
-    { id: generateId(), name: '转换插头', quantity: 2, weight: 100, unit: 'g' as const, priority: 'important' as const, groupId: groups[2].id, packed: false, note: '日本两扁插', sortOrder: 3 },
-    { id: generateId(), name: '移动WiFi', quantity: 1, weight: 150, unit: 'g' as const, priority: 'important' as const, groupId: groups[2].id, packed: false, note: '机场取还', sortOrder: 4 },
-    { id: generateId(), name: '牙刷套装', quantity: 2, weight: 80, unit: 'g' as const, priority: 'important' as const, groupId: groups[3].id, packed: false, note: '', sortOrder: 0 },
-    { id: generateId(), name: '防晒霜', quantity: 1, weight: 100, unit: 'g' as const, priority: 'must' as const, groupId: groups[3].id, packed: false, note: 'SPF50+', sortOrder: 1 },
-    { id: generateId(), name: '洗面奶', quantity: 1, weight: 120, unit: 'g' as const, priority: 'important' as const, groupId: groups[3].id, packed: false, note: '', sortOrder: 2 },
-    { id: generateId(), name: '毛巾', quantity: 2, weight: 150, unit: 'g' as const, priority: 'important' as const, groupId: groups[3].id, packed: false, note: '速干巾', sortOrder: 3 },
-    { id: generateId(), name: '感冒药', quantity: 1, weight: 50, unit: 'g' as const, priority: 'important' as const, groupId: groups[4].id, packed: false, note: '', sortOrder: 0 },
-    { id: generateId(), name: '肠胃药', quantity: 1, weight: 50, unit: 'g' as const, priority: 'must' as const, groupId: groups[4].id, packed: false, note: '吃生冷必带', sortOrder: 1 },
-    { id: generateId(), name: '创可贴', quantity: 10, weight: 20, unit: 'g' as const, priority: 'important' as const, groupId: groups[4].id, packed: false, note: '', sortOrder: 2 },
-    { id: generateId(), name: '晕车药', quantity: 1, weight: 20, unit: 'g' as const, priority: 'optional' as const, groupId: groups[4].id, packed: false, note: '新干线用', sortOrder: 3 },
+    { id: generateId(), name: '护照', quantity: 2, weight: 100, unit: 'g' as const, priority: 'must' as const, groupId: groups[0].id, bagSlot: 'carry-on' as BagSlot, packed: false, note: '每人一本', sortOrder: 0 },
+    { id: generateId(), name: '日本签证', quantity: 2, weight: 20, unit: 'g' as const, priority: 'must' as const, groupId: groups[0].id, bagSlot: 'carry-on' as BagSlot, packed: false, note: '打印的在留卡', sortOrder: 1 },
+    { id: generateId(), name: '机票行程单', quantity: 2, weight: 50, unit: 'g' as const, priority: 'must' as const, groupId: groups[0].id, bagSlot: 'carry-on' as BagSlot, packed: false, note: '电子版+纸质版', sortOrder: 2 },
+    { id: generateId(), name: '身份证', quantity: 2, weight: 20, unit: 'g' as const, priority: 'important' as const, groupId: groups[0].id, bagSlot: 'carry-on' as BagSlot, packed: false, note: '', sortOrder: 3 },
+    { id: generateId(), name: '短袖T恤', quantity: 8, weight: 200, unit: 'g' as const, priority: 'important' as const, groupId: groups[1].id, bagSlot: 'checked' as BagSlot, packed: false, note: '每人4件', sortOrder: 0 },
+    { id: generateId(), name: '内衣裤', quantity: 10, weight: 80, unit: 'g' as const, priority: 'important' as const, groupId: groups[1].id, bagSlot: 'checked' as BagSlot, packed: false, note: '', sortOrder: 1 },
+    { id: generateId(), name: '薄外套', quantity: 2, weight: 400, unit: 'g' as const, priority: 'optional' as const, groupId: groups[1].id, bagSlot: 'checked' as BagSlot, packed: false, note: '空调房用', sortOrder: 2 },
+    { id: generateId(), name: '轻便运动鞋', quantity: 2, weight: 500, unit: 'g' as const, priority: 'must' as const, groupId: groups[1].id, bagSlot: 'checked' as BagSlot, packed: false, note: '舒适为主', sortOrder: 3 },
+    { id: generateId(), name: '拖鞋', quantity: 2, weight: 300, unit: 'g' as const, priority: 'optional' as const, groupId: groups[1].id, bagSlot: 'hotel-storage' as BagSlot, packed: false, note: '酒店穿', sortOrder: 4 },
+    { id: generateId(), name: '手机', quantity: 2, weight: 200, unit: 'g' as const, priority: 'must' as const, groupId: groups[2].id, bagSlot: 'carry-on' as BagSlot, packed: false, note: '', sortOrder: 0 },
+    { id: generateId(), name: '充电宝', quantity: 1, weight: 200, unit: 'g' as const, priority: 'must' as const, groupId: groups[2].id, bagSlot: 'carry-on' as BagSlot, packed: false, note: '小于100Wh', sortOrder: 1 },
+    { id: generateId(), name: '充电器', quantity: 2, weight: 100, unit: 'g' as const, priority: 'must' as const, groupId: groups[2].id, bagSlot: 'carry-on' as BagSlot, packed: false, note: 'Type-C', sortOrder: 2 },
+    { id: generateId(), name: '转换插头', quantity: 2, weight: 100, unit: 'g' as const, priority: 'important' as const, groupId: groups[2].id, bagSlot: 'carry-on' as BagSlot, packed: false, note: '日本两扁插', sortOrder: 3 },
+    { id: generateId(), name: '移动WiFi', quantity: 1, weight: 150, unit: 'g' as const, priority: 'important' as const, groupId: groups[2].id, bagSlot: 'carry-on' as BagSlot, packed: false, note: '机场取还', sortOrder: 4 },
+    { id: generateId(), name: '牙刷套装', quantity: 2, weight: 80, unit: 'g' as const, priority: 'important' as const, groupId: groups[3].id, bagSlot: 'checked' as BagSlot, packed: false, note: '', sortOrder: 0 },
+    { id: generateId(), name: '防晒霜', quantity: 1, weight: 100, unit: 'g' as const, priority: 'must' as const, groupId: groups[3].id, bagSlot: 'checked' as BagSlot, packed: false, note: 'SPF50+', sortOrder: 1 },
+    { id: generateId(), name: '洗面奶', quantity: 1, weight: 120, unit: 'g' as const, priority: 'important' as const, groupId: groups[3].id, bagSlot: 'checked' as BagSlot, packed: false, note: '', sortOrder: 2 },
+    { id: generateId(), name: '毛巾', quantity: 2, weight: 150, unit: 'g' as const, priority: 'important' as const, groupId: groups[3].id, bagSlot: 'hotel-storage' as BagSlot, packed: false, note: '速干巾', sortOrder: 3 },
+    { id: generateId(), name: '感冒药', quantity: 1, weight: 50, unit: 'g' as const, priority: 'important' as const, groupId: groups[4].id, bagSlot: 'carry-on' as BagSlot, packed: false, note: '', sortOrder: 0 },
+    { id: generateId(), name: '肠胃药', quantity: 1, weight: 50, unit: 'g' as const, priority: 'must' as const, groupId: groups[4].id, bagSlot: 'carry-on' as BagSlot, packed: false, note: '吃生冷必带', sortOrder: 1 },
+    { id: generateId(), name: '创可贴', quantity: 10, weight: 20, unit: 'g' as const, priority: 'important' as const, groupId: groups[4].id, bagSlot: 'carry-on' as BagSlot, packed: false, note: '', sortOrder: 2 },
+    { id: generateId(), name: '晕车药', quantity: 1, weight: 20, unit: 'g' as const, priority: 'optional' as const, groupId: groups[4].id, bagSlot: 'carry-on' as BagSlot, packed: false, note: '新干线用', sortOrder: 3 },
   ];
 
   return {
@@ -484,6 +486,8 @@ export const createInitialPackingList = (
     name,
     maxWeight,
     maxWeightUnit,
+    carryOnLimit,
+    checkedLimit,
     groups,
     items,
     createdAt: new Date().toISOString(),

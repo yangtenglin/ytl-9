@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useMemo, useState, useRef, useEffect } from 'react';
 import {
   X,
   Plus,
@@ -16,10 +16,16 @@ import {
   Star,
   FolderPlus,
   Download,
+  Briefcase,
+  Luggage,
+  Hotel,
+  Camera,
+  RefreshCw,
+  Image,
 } from 'lucide-react';
 import { useTripStore } from '@/store/useTripStore';
-import type { PackingItem, PackingGroup, PriorityLevel } from '@/types';
-import { PRIORITY_LABELS, PRIORITY_COLORS, DEFAULT_PACKING_GROUPS } from '@/types';
+import type { PackingItem, PackingGroup, PriorityLevel, BagSlot } from '@/types';
+import { PRIORITY_LABELS, PRIORITY_COLORS, DEFAULT_PACKING_GROUPS, BAG_SLOT_LABELS, BAG_SLOT_COLORS } from '@/types';
 
 const formatWeight = (grams: number): string => {
   if (grams >= 1000) {
@@ -34,6 +40,12 @@ const GROUP_COLOR_MAP: Record<string, string> = {
   'tape-orange': 'bg-tape-orange/15 border-tape-orange/40 text-orange-700',
   'tape-green': 'bg-tape-green/20 border-tape-green/40 text-green-700',
   'tape-yellow': 'bg-tape-yellow/20 border-tape-yellow/50 text-amber-700',
+};
+
+const BAG_SLOT_ICONS: Record<BagSlot, React.ReactNode> = {
+  'carry-on': <Briefcase size={10} />,
+  'checked': <Luggage size={10} />,
+  'hotel-storage': <Hotel size={10} />,
 };
 
 interface ItemFormProps {
@@ -51,6 +63,7 @@ const ItemForm: React.FC<ItemFormProps> = ({ groups, initial, onSubmit, onCancel
     unit: initial?.unit || 'g' as const,
     priority: initial?.priority || 'important' as PriorityLevel,
     groupId: initial?.groupId || groups[0]?.id || '',
+    bagSlot: (initial?.bagSlot || 'checked') as BagSlot,
     note: initial?.note || '',
   });
 
@@ -64,6 +77,7 @@ const ItemForm: React.FC<ItemFormProps> = ({ groups, initial, onSubmit, onCancel
       unit: form.unit,
       priority: form.priority,
       groupId: form.groupId,
+      bagSlot: form.bagSlot,
       packed: initial?.packed ?? false,
       note: form.note.trim(),
     });
@@ -102,6 +116,18 @@ const ItemForm: React.FC<ItemFormProps> = ({ groups, initial, onSubmit, onCancel
             className="w-full px-3 py-2 rounded-lg border-2 border-ink-500/20 bg-paper-50 text-sm focus:border-ink-500 focus:outline-none transition-colors"
           >
             {Object.entries(PRIORITY_LABELS).map(([k, v]) => (
+              <option key={k} value={k}>{v}</option>
+            ))}
+          </select>
+        </div>
+        <div>
+          <label className="block text-xs text-ink-500 mb-1 font-medium">箱包分配</label>
+          <select
+            value={form.bagSlot}
+            onChange={(e) => setForm({ ...form, bagSlot: e.target.value as BagSlot })}
+            className="w-full px-3 py-2 rounded-lg border-2 border-ink-500/20 bg-paper-50 text-sm focus:border-ink-500 focus:outline-none transition-colors"
+          >
+            {Object.entries(BAG_SLOT_LABELS).map(([k, v]) => (
               <option key={k} value={k}>{v}</option>
             ))}
           </select>
@@ -230,12 +256,14 @@ interface ItemCardProps {
   onToggle: () => void;
   onEdit: () => void;
   onDelete: () => void;
+  onBagSlotChange: (slot: BagSlot) => void;
 }
 
-const ItemCard: React.FC<ItemCardProps> = ({ item, onToggle, onEdit, onDelete }) => {
+const ItemCard: React.FC<ItemCardProps> = ({ item, onToggle, onEdit, onDelete, onBagSlotChange }) => {
   const convertToGrams = (w: number, unit: 'g' | 'kg') => unit === 'kg' ? w * 1000 : w;
   const itemWeight = convertToGrams(item.weight * item.quantity, item.unit);
   const singleWeight = convertToGrams(item.weight, item.unit);
+  const bagSlot = item.bagSlot || 'checked';
 
   return (
     <div className={`relative rounded-xl border-2 p-3 transition-all hover:shadow-paper ${
@@ -266,6 +294,10 @@ const ItemCard: React.FC<ItemCardProps> = ({ item, onToggle, onEdit, onDelete })
               {item.priority === 'must' && <Star size={10} fill="currentColor" />}
               {PRIORITY_LABELS[item.priority]}
             </span>
+            <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs border ${BAG_SLOT_COLORS[bagSlot]}`}>
+              {BAG_SLOT_ICONS[bagSlot]}
+              {BAG_SLOT_LABELS[bagSlot]}
+            </span>
             {item.quantity > 1 && (
               <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs bg-ink-500/10 text-ink-600 border border-ink-500/20">
                 ×{item.quantity}
@@ -293,6 +325,15 @@ const ItemCard: React.FC<ItemCardProps> = ({ item, onToggle, onEdit, onDelete })
           )}
 
           <div className="flex items-center gap-2">
+            <select
+              value={bagSlot}
+              onChange={(e) => onBagSlotChange(e.target.value as BagSlot)}
+              className="text-xs px-2 py-1 rounded-lg border border-ink-500/20 bg-paper-50 text-ink-600 focus:outline-none focus:border-ink-500"
+            >
+              {Object.entries(BAG_SLOT_LABELS).map(([k, v]) => (
+                <option key={k} value={k}>{v}</option>
+              ))}
+            </select>
             <button
               onClick={onEdit}
               className="inline-flex items-center gap-1 px-2 py-1 text-xs rounded-lg bg-paper-100 text-ink-500 hover:bg-tape-yellow/20 hover:text-amber-700 transition-colors"
@@ -321,6 +362,7 @@ interface GroupSectionProps {
   onToggleItem: (id: string) => void;
   onEditItem: (item: PackingItem) => void;
   onDeleteItem: (id: string) => void;
+  onBagSlotChange: (id: string, slot: BagSlot) => void;
   onEditGroup: () => void;
   onDeleteGroup: () => void;
   onAddItem: () => void;
@@ -333,6 +375,7 @@ const GroupSection: React.FC<GroupSectionProps> = ({
   onToggleItem,
   onEditItem,
   onDeleteItem,
+  onBagSlotChange,
   onEditGroup,
   onDeleteGroup,
   onAddItem,
@@ -417,11 +460,291 @@ const GroupSection: React.FC<GroupSectionProps> = ({
                 onToggle={() => onToggleItem(item.id)}
                 onEdit={() => onEditItem(item)}
                 onDelete={() => onDeleteItem(item.id)}
+                onBagSlotChange={(slot) => onBagSlotChange(item.id, slot)}
               />
             ))
           )}
         </div>
       )}
+    </div>
+  );
+};
+
+interface CameraModalProps {
+  groups: PackingGroup[];
+  onCapture: (photoData: string, itemData: Omit<PackingItem, 'id' | 'sortOrder'>) => void;
+  onClose: () => void;
+}
+
+const CameraModal: React.FC<CameraModalProps> = ({ groups, onCapture, onClose }) => {
+  const videoRef = useRef<HTMLVideoElement>(null);
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const streamRef = useRef<MediaStream | null>(null);
+
+  const [cameraError, setCameraError] = useState<string | null>(null);
+  const [capturedImage, setCapturedImage] = useState<string | null>(null);
+  const [isCapturing, setIsCapturing] = useState(false);
+
+  const [itemName, setItemName] = useState('');
+  const [quantity, setQuantity] = useState(1);
+  const [weight, setWeight] = useState(100);
+  const [unit, setUnit] = useState<'g' | 'kg'>('g');
+  const [priority, setPriority] = useState<PriorityLevel>('important');
+  const [groupId, setGroupId] = useState(groups[0]?.id || '');
+  const [bagSlot, setBagSlot] = useState<BagSlot>('checked');
+  const [note, setNote] = useState('');
+
+  const startCamera = async () => {
+    setCameraError(null);
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: { facingMode: 'environment' },
+        audio: false,
+      });
+      streamRef.current = stream;
+      if (videoRef.current) {
+        videoRef.current.srcObject = stream;
+        await videoRef.current.play();
+      }
+    } catch (_err) {
+      setCameraError('无法访问相机，请检查浏览器权限设置。您也可以手动填写物品信息。');
+    }
+  };
+
+  const stopCamera = () => {
+    if (streamRef.current) {
+      streamRef.current.getTracks().forEach(track => track.stop());
+      streamRef.current = null;
+    }
+  };
+
+  useEffect(() => {
+    startCamera();
+    return () => stopCamera();
+  }, []);
+
+  const handleCapture = () => {
+    if (!videoRef.current || !canvasRef.current) return;
+    setIsCapturing(true);
+
+    const video = videoRef.current;
+    const canvas = canvasRef.current;
+    canvas.width = video.videoWidth;
+    canvas.height = video.videoHeight;
+
+    const ctx = canvas.getContext('2d');
+    if (ctx) {
+      ctx.drawImage(video, 0, 0);
+      const dataUrl = canvas.toDataURL('image/jpeg', 0.8);
+      setCapturedImage(dataUrl);
+      stopCamera();
+    }
+    setIsCapturing(false);
+  };
+
+  const handleRetake = () => {
+    setCapturedImage(null);
+    startCamera();
+  };
+
+  const handleSubmit = () => {
+    if (!itemName.trim() || !groupId) return;
+    onCapture(capturedImage || '', {
+      name: itemName.trim(),
+      quantity: Math.max(1, quantity),
+      weight: Math.max(0, weight),
+      unit,
+      priority,
+      groupId,
+      bagSlot,
+      packed: false,
+      note: note.trim(),
+    });
+  };
+
+  return (
+    <div className="fixed inset-0 bg-ink-700/70 flex items-center justify-center z-[60] p-4">
+      <div className="relative card-paper w-full max-w-2xl max-h-[90vh] flex flex-col animate-fade-in-up">
+        <div className="tape-decoration" />
+        <div className="flex items-center justify-between px-6 py-4 border-b border-paper-200">
+          <h3 className="font-handwritten text-2xl font-bold text-ink-700 flex items-center gap-2">
+            <Camera size={22} />
+            拍照添加物品
+          </h3>
+          <button
+            onClick={() => { stopCamera(); onClose(); }}
+            className="p-2 rounded-full hover:bg-paper-200 transition-colors text-ink-500 hover:text-ink-700"
+          >
+            <X size={20} />
+          </button>
+        </div>
+
+        <div className="flex-1 overflow-y-auto p-6 space-y-4">
+          <div className="relative bg-ink-700 rounded-xl overflow-hidden aspect-video flex items-center justify-center">
+            {cameraError ? (
+              <div className="text-center p-6 text-paper-100">
+                <Image size={40} className="mx-auto mb-2 opacity-60" />
+                <p className="text-sm">{cameraError}</p>
+              </div>
+            ) : capturedImage ? (
+              <img src={capturedImage} alt="Captured" className="w-full h-full object-contain" />
+            ) : (
+              <>
+                <video
+                  ref={videoRef}
+                  className="w-full h-full object-contain"
+                  playsInline
+                  muted
+                />
+                <div className="absolute bottom-4 left-1/2 -translate-x-1/2 bg-ink-700/60 text-paper-100 text-xs px-3 py-1 rounded-full">
+                  请将物品对准镜头
+                </div>
+              </>
+            )}
+            <canvas ref={canvasRef} className="hidden" />
+          </div>
+
+          {!capturedImage && !cameraError && (
+            <div className="flex justify-center">
+              <button
+                onClick={handleCapture}
+                disabled={isCapturing}
+                className="btn-primary flex items-center gap-2"
+              >
+                <Camera size={16} />
+                {isCapturing ? '拍照中...' : '拍照'}
+              </button>
+            </div>
+          )}
+
+          {capturedImage && (
+            <div className="flex justify-center gap-2">
+              <button onClick={handleRetake} className="btn-secondary flex items-center gap-2">
+                <RefreshCw size={14} />
+                重拍
+              </button>
+            </div>
+          )}
+
+          <div className="space-y-3 p-4 bg-paper-100 rounded-xl border-2 border-dashed border-ink-500/20">
+            <h4 className="text-sm font-bold text-ink-600 flex items-center gap-2">
+              <Package size={14} />
+              物品信息
+            </h4>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div className="sm:col-span-2">
+                <label className="block text-xs text-ink-500 mb-1 font-medium">物品名称 *</label>
+                <input
+                  type="text"
+                  value={itemName}
+                  onChange={(e) => setItemName(e.target.value)}
+                  className="w-full px-3 py-2 rounded-lg border-2 border-ink-500/20 bg-paper-50 text-sm focus:border-ink-500 focus:outline-none"
+                  placeholder="例如：洗发水"
+                  required
+                />
+              </div>
+              <div>
+                <label className="block text-xs text-ink-500 mb-1 font-medium">所属分组 *</label>
+                <select
+                  value={groupId}
+                  onChange={(e) => setGroupId(e.target.value)}
+                  className="w-full px-3 py-2 rounded-lg border-2 border-ink-500/20 bg-paper-50 text-sm focus:border-ink-500 focus:outline-none"
+                  required
+                >
+                  {groups.map(g => <option key={g.id} value={g.id}>{g.name}</option>)}
+                </select>
+              </div>
+              <div>
+                <label className="block text-xs text-ink-500 mb-1 font-medium">必带级别</label>
+                <select
+                  value={priority}
+                  onChange={(e) => setPriority(e.target.value as PriorityLevel)}
+                  className="w-full px-3 py-2 rounded-lg border-2 border-ink-500/20 bg-paper-50 text-sm focus:border-ink-500 focus:outline-none"
+                >
+                  {Object.entries(PRIORITY_LABELS).map(([k, v]) => (
+                    <option key={k} value={k}>{v}</option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label className="block text-xs text-ink-500 mb-1 font-medium">箱包分配</label>
+                <select
+                  value={bagSlot}
+                  onChange={(e) => setBagSlot(e.target.value as BagSlot)}
+                  className="w-full px-3 py-2 rounded-lg border-2 border-ink-500/20 bg-paper-50 text-sm focus:border-ink-500 focus:outline-none"
+                >
+                  {Object.entries(BAG_SLOT_LABELS).map(([k, v]) => (
+                    <option key={k} value={k}>{v}</option>
+                  ))}
+                </select>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-3 gap-3">
+              <div>
+                <label className="block text-xs text-ink-500 mb-1 font-medium">数量</label>
+                <input
+                  type="number"
+                  min="1"
+                  value={quantity}
+                  onChange={(e) => setQuantity(parseInt(e.target.value) || 1)}
+                  className="w-full px-3 py-2 rounded-lg border-2 border-ink-500/20 bg-paper-50 text-sm font-mono focus:border-ink-500 focus:outline-none"
+                />
+              </div>
+              <div>
+                <label className="block text-xs text-ink-500 mb-1 font-medium">单件重量</label>
+                <input
+                  type="number"
+                  min="0"
+                  step="0.1"
+                  value={weight}
+                  onChange={(e) => setWeight(parseFloat(e.target.value) || 0)}
+                  className="w-full px-3 py-2 rounded-lg border-2 border-ink-500/20 bg-paper-50 text-sm font-mono focus:border-ink-500 focus:outline-none"
+                />
+              </div>
+              <div>
+                <label className="block text-xs text-ink-500 mb-1 font-medium">单位</label>
+                <select
+                  value={unit}
+                  onChange={(e) => setUnit(e.target.value as 'g' | 'kg')}
+                  className="w-full px-3 py-2 rounded-lg border-2 border-ink-500/20 bg-paper-50 text-sm focus:border-ink-500 focus:outline-none"
+                >
+                  <option value="g">克 (g)</option>
+                  <option value="kg">千克 (kg)</option>
+                </select>
+              </div>
+            </div>
+
+            <div>
+              <label className="block text-xs text-ink-500 mb-1 font-medium">备注</label>
+              <textarea
+                value={note}
+                onChange={(e) => setNote(e.target.value)}
+                rows={2}
+                className="w-full px-3 py-2 rounded-lg border-2 border-ink-500/20 bg-paper-50 text-sm focus:border-ink-500 focus:outline-none resize-none"
+                placeholder="添加备注信息"
+              />
+            </div>
+          </div>
+        </div>
+
+        <div className="flex gap-2 px-6 py-4 border-t border-paper-200">
+          <button
+            onClick={() => { stopCamera(); onClose(); }}
+            className="flex-1 btn-secondary text-sm py-2"
+          >
+            取消
+          </button>
+          <button
+            onClick={handleSubmit}
+            disabled={!itemName.trim() || !groupId}
+            className="flex-1 btn-primary text-sm py-2 flex items-center justify-center gap-1 disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            <Save size={14} />
+            添加物品
+          </button>
+        </div>
+      </div>
     </div>
   );
 };
@@ -449,12 +772,15 @@ export const PackingList: React.FC = () => {
   const [showItemForm, setShowItemForm] = useState(false);
   const [showGroupForm, setShowGroupForm] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
+  const [showCameraModal, setShowCameraModal] = useState(false);
   const [editingItem, setEditingItem] = useState<PackingItem | null>(null);
   const [editingGroup, setEditingGroup] = useState<PackingGroup | null>(null);
   const [prefillGroupId, setPrefillGroupId] = useState<string | null>(null);
 
   const [maxWeight, setMaxWeight] = useState(20);
   const [maxWeightUnit, setMaxWeightUnit] = useState<'g' | 'kg'>('kg');
+  const [carryOnLimit, setCarryOnLimit] = useState(7);
+  const [checkedLimit, setCheckedLimit] = useState(20);
   const [listName, setListName] = useState('行李清单');
 
   const packingList = getCurrentPackingList();
@@ -463,15 +789,17 @@ export const PackingList: React.FC = () => {
     if (packingList) {
       setMaxWeight(packingList.maxWeight);
       setMaxWeightUnit(packingList.maxWeightUnit);
+      setCarryOnLimit(packingList.carryOnLimit ?? 7);
+      setCheckedLimit(packingList.checkedLimit ?? 20);
       setListName(packingList.name);
     }
   }, [packingList?.id]);
 
   const handleSaveSettings = () => {
     if (!packingList) {
-      createPackingList(listName, maxWeight, maxWeightUnit);
+      createPackingList(listName, maxWeight, maxWeightUnit, carryOnLimit, checkedLimit);
     } else {
-      updatePackingList({ name: listName, maxWeight, maxWeightUnit });
+      updatePackingList({ name: listName, maxWeight, maxWeightUnit, carryOnLimit, checkedLimit });
     }
     setShowSettings(false);
   };
@@ -505,8 +833,13 @@ export const PackingList: React.FC = () => {
     lines.push(`- 已装: ${packingStats.packedItems} (${packingStats.totalItems > 0 ? ((packingStats.packedItems / packingStats.totalItems) * 100).toFixed(0) : 0}%)`);
     lines.push(`- 总重量: ${formatWeight(packingStats.totalWeight)}`);
     lines.push(`- 未装必带: ${packingStats.mustUnpacked}`);
+    lines.push(``);
+    lines.push(`## 箱包分配`);
+    lines.push(`- 随身包: ${formatWeight(packingStats.carryOnWeight)} / ${formatWeight(packingStats.carryOnLimit)}${packingStats.carryOnOverWeight ? ' ⚠️ 超重！' : ''}`);
+    lines.push(`- 托运行李: ${formatWeight(packingStats.checkedWeight)} / ${formatWeight(packingStats.checkedLimit)}${packingStats.checkedOverWeight ? ' ⚠️ 超重！' : ''}`);
+    lines.push(`- 酒店寄存: ${formatWeight(packingStats.hotelStorageWeight)}`);
     if (packingStats.isOverWeight) {
-      lines.push(`- ⚠️ 超重: ${formatWeight(packingStats.totalWeight - packingStats.maxWeight)}`);
+      lines.push(`- ⚠️ 总超重: ${formatWeight(packingStats.totalWeight - packingStats.maxWeight)}`);
     }
 
     const blob = new Blob([lines.join('\n')], { type: 'text/plain;charset=utf-8' });
@@ -559,7 +892,7 @@ export const PackingList: React.FC = () => {
               </div>
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-xs text-ink-500 mb-1 font-medium">限重</label>
+                  <label className="block text-xs text-ink-500 mb-1 font-medium">总限重</label>
                   <input
                     type="number"
                     min="0"
@@ -579,6 +912,30 @@ export const PackingList: React.FC = () => {
                     <option value="kg">千克 (kg)</option>
                     <option value="g">克 (g)</option>
                   </select>
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs text-ink-500 mb-1 font-medium">随身包限重 (kg)</label>
+                  <input
+                    type="number"
+                    min="0"
+                    step="0.5"
+                    value={carryOnLimit}
+                    onChange={(e) => setCarryOnLimit(parseFloat(e.target.value) || 0)}
+                    className="w-full px-3 py-2 rounded-lg border-2 border-ink-500/20 bg-paper-50 text-sm font-mono focus:border-ink-500 focus:outline-none"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs text-ink-500 mb-1 font-medium">托运限重 (kg)</label>
+                  <input
+                    type="number"
+                    min="0"
+                    step="0.5"
+                    value={checkedLimit}
+                    onChange={(e) => setCheckedLimit(parseFloat(e.target.value) || 0)}
+                    className="w-full px-3 py-2 rounded-lg border-2 border-ink-500/20 bg-paper-50 text-sm font-mono focus:border-ink-500 focus:outline-none"
+                  />
                 </div>
               </div>
             </div>
@@ -607,7 +964,7 @@ export const PackingList: React.FC = () => {
             <h2 className="font-handwritten text-3xl font-bold text-ink-700">
               <span className="handwritten-underline">{packingList.name}</span>
             </h2>
-            <p className="text-xs text-ink-500 mt-1">分组管理 · 重量控制 · 必带标记 · 本地自动保存</p>
+            <p className="text-xs text-ink-500 mt-1">分组管理 · 重量控制 · 箱包分配 · 必带标记 · 本地自动保存</p>
           </div>
           <button
             onClick={() => setShowPackingModal(false)}
@@ -648,6 +1005,38 @@ export const PackingList: React.FC = () => {
                 {packingStats.mustUnpacked}
               </div>
               <div className={`text-xs ${packingStats.mustUnpacked > 0 ? 'text-red-600' : 'text-ink-500'}`}>未装必带</div>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-3 gap-2">
+            <div className={`rounded-xl p-3 border text-center ${packingStats.carryOnOverWeight ? 'bg-red-100 border-red-300' : 'bg-tape-blue/15 border-tape-blue/40'}`}>
+              <div className="flex items-center justify-center gap-1 mb-1">
+                <Briefcase size={12} className={packingStats.carryOnOverWeight ? 'text-red-600' : 'text-blue-700'} />
+                <span className={`text-xs font-medium ${packingStats.carryOnOverWeight ? 'text-red-600' : 'text-blue-700'}`}>随身包</span>
+                {packingStats.carryOnOverWeight && <AlertTriangle size={12} className="text-red-500" />}
+              </div>
+              <div className={`font-mono text-sm font-bold ${packingStats.carryOnOverWeight ? 'text-red-600' : 'text-blue-700'}`}>
+                {formatWeight(packingStats.carryOnWeight)} / {formatWeight(packingStats.carryOnLimit)}
+              </div>
+            </div>
+            <div className={`rounded-xl p-3 border text-center ${packingStats.checkedOverWeight ? 'bg-red-100 border-red-300' : 'bg-tape-orange/15 border-tape-orange/40'}`}>
+              <div className="flex items-center justify-center gap-1 mb-1">
+                <Luggage size={12} className={packingStats.checkedOverWeight ? 'text-red-600' : 'text-orange-700'} />
+                <span className={`text-xs font-medium ${packingStats.checkedOverWeight ? 'text-red-600' : 'text-orange-700'}`}>托运行李</span>
+                {packingStats.checkedOverWeight && <AlertTriangle size={12} className="text-red-500" />}
+              </div>
+              <div className={`font-mono text-sm font-bold ${packingStats.checkedOverWeight ? 'text-red-600' : 'text-orange-700'}`}>
+                {formatWeight(packingStats.checkedWeight)} / {formatWeight(packingStats.checkedLimit)}
+              </div>
+            </div>
+            <div className="rounded-xl p-3 border bg-tape-green/15 border-tape-green/40 text-center">
+              <div className="flex items-center justify-center gap-1 mb-1">
+                <Hotel size={12} className="text-green-700" />
+                <span className="text-xs font-medium text-green-700">酒店寄存</span>
+              </div>
+              <div className="font-mono text-sm font-bold text-green-700">
+                {formatWeight(packingStats.hotelStorageWeight)}
+              </div>
             </div>
           </div>
 
@@ -694,6 +1083,23 @@ export const PackingList: React.FC = () => {
             </div>
           )}
 
+          {(packingStats.carryOnOverWeight || packingStats.checkedOverWeight) && !packingStats.isOverWeight && (
+            <div className="flex items-center gap-2 p-3 rounded-xl bg-orange-50 border-2 border-orange-200 text-orange-700">
+              <AlertTriangle size={20} className="flex-shrink-0" />
+              <div className="text-sm">
+                {packingStats.carryOnOverWeight && packingStats.checkedOverWeight && (
+                  <><strong>随身包和托运行李均超重！</strong>请调整箱包分配或减少物品。</>
+                )}
+                {packingStats.carryOnOverWeight && !packingStats.checkedOverWeight && (
+                  <><strong>随身包超重！</strong>超出 {formatWeight(packingStats.carryOnWeight - packingStats.carryOnLimit)}，请将部分物品移至托运或酒店寄存。</>
+                )}
+                {!packingStats.carryOnOverWeight && packingStats.checkedOverWeight && (
+                  <><strong>托运行李超重！</strong>超出 {formatWeight(packingStats.checkedWeight - packingStats.checkedLimit)}，请将部分物品移至酒店寄存或减少物品。</>
+                )}
+              </div>
+            </div>
+          )}
+
           {packingStats.mustUnpacked > 0 && !packingStats.isOverWeight && (
             <div className="flex items-center gap-2 p-3 rounded-xl bg-amber-50 border-2 border-amber-200 text-amber-700">
               <AlertCircle size={20} className="flex-shrink-0" />
@@ -710,6 +1116,13 @@ export const PackingList: React.FC = () => {
             >
               <Plus size={14} />
               添加物品
+            </button>
+            <button
+              onClick={() => setShowCameraModal(true)}
+              className="btn-secondary flex items-center gap-2 text-sm py-2"
+            >
+              <Camera size={14} />
+              拍照添加
             </button>
             <button
               onClick={() => { setShowGroupForm(true); setShowItemForm(false); setEditingGroup(null); }}
@@ -754,7 +1167,7 @@ export const PackingList: React.FC = () => {
                   />
                 </div>
                 <div>
-                  <label className="block text-xs text-ink-500 mb-1 font-medium">限重</label>
+                  <label className="block text-xs text-ink-500 mb-1 font-medium">总限重</label>
                   <input
                     type="number"
                     min="0"
@@ -774,6 +1187,30 @@ export const PackingList: React.FC = () => {
                     <option value="kg">千克 (kg)</option>
                     <option value="g">克 (g)</option>
                   </select>
+                </div>
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs text-ink-500 mb-1 font-medium">随身包限重 (kg)</label>
+                  <input
+                    type="number"
+                    min="0"
+                    step="0.5"
+                    value={carryOnLimit}
+                    onChange={(e) => setCarryOnLimit(parseFloat(e.target.value) || 0)}
+                    className="w-full px-3 py-2 rounded-lg border-2 border-ink-500/20 bg-paper-50 text-sm font-mono focus:border-ink-500 focus:outline-none"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs text-ink-500 mb-1 font-medium">托运限重 (kg)</label>
+                  <input
+                    type="number"
+                    min="0"
+                    step="0.5"
+                    value={checkedLimit}
+                    onChange={(e) => setCheckedLimit(parseFloat(e.target.value) || 0)}
+                    className="w-full px-3 py-2 rounded-lg border-2 border-ink-500/20 bg-paper-50 text-sm font-mono focus:border-ink-500 focus:outline-none"
+                  />
                 </div>
               </div>
               <div className="flex gap-2">
@@ -847,6 +1284,13 @@ export const PackingList: React.FC = () => {
                   添加第一项物品
                 </button>
                 <button
+                  onClick={() => setShowCameraModal(true)}
+                  className="btn-secondary inline-flex items-center gap-2"
+                >
+                  <Camera size={16} />
+                  拍照添加
+                </button>
+                <button
                   onClick={() => { setShowGroupForm(true); setShowItemForm(false); }}
                   className="btn-secondary inline-flex items-center gap-2"
                 >
@@ -869,6 +1313,7 @@ export const PackingList: React.FC = () => {
                   onDeleteItem={(id) => {
                     if (confirm('确定删除这个物品吗？')) deletePackingItem(id);
                   }}
+                  onBagSlotChange={(id, slot) => updatePackingItem(id, { bagSlot: slot })}
                   onEditGroup={() => { setEditingGroup(group); setShowGroupForm(true); setShowItemForm(false); }}
                   onDeleteGroup={() => {
                     if (confirm(`确定删除分组"${group.name}"吗？该分组下的物品也会被删除。`)) {
@@ -881,6 +1326,17 @@ export const PackingList: React.FC = () => {
           )}
         </div>
       </div>
+
+      {showCameraModal && packingList && (
+        <CameraModal
+          groups={packingList.groups}
+          onCapture={(_photoData, itemData) => {
+            addPackingItem(itemData);
+            setShowCameraModal(false);
+          }}
+          onClose={() => setShowCameraModal(false)}
+        />
+      )}
     </div>
   );
 };
