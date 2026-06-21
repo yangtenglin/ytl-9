@@ -39,13 +39,13 @@ export const DayColumn: React.FC<DayColumnProps> = ({ date, index }) => {
   const activityTotal = calculateByType(items, 'activity');
   const dayTotal = transportTotal + accommodationTotal + activityTotal;
 
-  const uniqueCities = [...new Set(items.map(i => i.city))];
+  const uniqueCities = [...new Set(filteredItems.map(i => i.city))];
   const weatherByCity = uniqueCities.map(city => ({
     city,
     weather: currentPlan?.dailyWeather.find(w => w.date === date && w.city === city),
   }));
 
-  const hasWeatherRisk = items.some(item => {
+  const hasWeatherRisk = filteredItems.some(item => {
     if (!item.isOutdoor) return false;
     const weather = currentPlan?.dailyWeather.find(w => w.date === item.startDate && w.city === item.city);
     if (!weather) return false;
@@ -55,7 +55,7 @@ export const DayColumn: React.FC<DayColumnProps> = ({ date, index }) => {
     return false;
   });
 
-  const maxRiskLevel = items.reduce((max, item) => {
+  const maxRiskLevel = filteredItems.reduce((max, item) => {
     if (!item.isOutdoor) return max;
     const weather = currentPlan?.dailyWeather.find(w => w.date === item.startDate && w.city === item.city);
     if (!weather) return max;
