@@ -9,9 +9,10 @@ import { SplitModal } from '@/components/SplitModal';
 import { PlanManager } from '@/components/PlanManager';
 import { VisaChecklist } from '@/components/VisaChecklist';
 import { PackingList } from '@/components/PackingList';
+import { WeatherEditor } from '@/components/WeatherEditor';
 
 export default function App() {
-  const { editingItem, setEditingItem, showSplitModal, showPlanModal, showVisaModal, showPackingModal, currentPlan } = useTripStore();
+  const { editingItem, setEditingItem, editingWeather, setEditingWeather, showSplitModal, showPlanModal, showVisaModal, showPackingModal, showWeatherModal, setShowWeatherModal, currentPlan } = useTripStore();
 
   return (
     <div className="min-h-screen flex flex-col">
@@ -58,6 +59,16 @@ export default function App() {
       {showVisaModal && <VisaChecklist />}
 
       {showPackingModal && <PackingList />}
+
+      {showWeatherModal && editingWeather && (
+        <WeatherEditor
+          weather={editingWeather}
+          onClose={() => {
+            setShowWeatherModal(false);
+            setEditingWeather(null);
+          }}
+        />
+      )}
     </div>
   );
 }

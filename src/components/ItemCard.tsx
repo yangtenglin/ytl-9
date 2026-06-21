@@ -46,6 +46,7 @@ const weatherBorderColors: Record<string, string> = {
 };
 
 export const ItemCard: React.FC<ItemCardProps> = ({ item, index }) => {
+  const currentPlan = useTripStore(state => state.plans.find(p => p.id === state.currentPlanId));
   const {
     setEditingItem,
     deleteItem,
@@ -67,9 +68,33 @@ export const ItemCard: React.FC<ItemCardProps> = ({ item, index }) => {
 
   const isFiltered = selectedCity && item.city !== selectedCity;
 
-  const riskLevel = getWeatherRiskLevel(item);
-  const weatherAffected = isWeatherAffected(item);
-  const weather = getWeatherForDate(item.startDate, item.city);
+  const weather = currentPlan?.dailyWeather.find(w => w.date === item.startDate && w.city === item.city);
+  
+  const weatherAffected = React.useMemo(() => {
+    if (!item.isOutdoor || !weather) return false;
+    if (weather.weather === 'rainy' || weather.weather === 'stormy' || weather.weather === 'snowy') return true;
+    if (weather.precipitationProbability !== undefined && weather.precipitationProbability >= 50) return true;
+    if (weather.windSpeed !== undefined && weather.windSpeed >= 15) return true;
+    return false;
+  }, [item.isOutdoor, weather]);
+
+  const riskLevel = React.useMemo(() => {
+    if (!item.isOutdoor || !weather) return 'safe';
+    const risks: ('safe' | 'caution' | 'danger')[] = [];
+    if (weather.weather === 'stormy') risks.push('danger');
+    else if (weather.weather === 'rainy' || weather.weather === 'snowy') risks.push('caution');
+    if (weather.precipitationProbability !== undefined) {
+      if (weather.precipitationProbability >= 80) risks.push('danger');
+      else if (weather.precipitationProbability >= 50) risks.push('caution');
+    }
+    if (weather.windSpeed !== undefined) {
+      if (weather.windSpeed >= 25) risks.push('danger');
+      else if (weather.windSpeed >= 15) risks.push('caution');
+    }
+    if (risks.includes('danger')) return 'danger';
+    if (risks.includes('caution')) return 'caution';
+    return 'safe';
+  }, [item.isOutdoor, weather]);
   const adoptedBackups = item.backupPlans.filter(b => b.status === 'adopted');
   const activeBackup = item.activeBackupId
     ? adoptedBackups.find(b => b.id === item.activeBackupId)

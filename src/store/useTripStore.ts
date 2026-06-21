@@ -46,17 +46,47 @@ const storedPlans = rawStoredPlans.map(plan => ({
 }));
 
 const initialPlans = storedPlans.length > 0 ? storedPlans : getInitialPlans();
-const initialPlanId = storedCurrentPlanId || getInitialPlanId();
+const initialPlanId = storedCurrentPlanId && initialPlans.some(p => p.id === storedCurrentPlanId)
+  ? storedCurrentPlanId
+  : (initialPlans.length > 0 ? initialPlans[0].id : null);
 
-const calculateWeatherRisk = (weather: WeatherType | undefined, isOutdoor: boolean): WeatherRiskLevel => {
+const calculateWeatherRisk = (
+  weather: WeatherType | undefined,
+  precipitationProbability: number | undefined,
+  windSpeed: number | undefined,
+  isOutdoor: boolean,
+): WeatherRiskLevel => {
   if (!isOutdoor || !weather) return 'safe';
-  if (weather === 'stormy') return 'danger';
-  if (weather === 'rainy' || weather === 'snowy') return 'caution';
+
+  const risks: WeatherRiskLevel[] = [];
+
+  if (weather === 'stormy') risks.push('danger');
+  else if (weather === 'rainy' || weather === 'snowy') risks.push('caution');
+
+  if (precipitationProbability !== undefined) {
+    if (precipitationProbability >= 80) risks.push('danger');
+    else if (precipitationProbability >= 50) risks.push('caution');
+  }
+
+  if (windSpeed !== undefined) {
+    if (windSpeed >= 25) risks.push('danger');
+    else if (windSpeed >= 15) risks.push('caution');
+  }
+
+  if (risks.includes('danger')) return 'danger';
+  if (risks.includes('caution')) return 'caution';
   return 'safe';
 };
 
-const isBadWeather = (weather: WeatherType | undefined): boolean => {
-  return weather === 'rainy' || weather === 'stormy' || weather === 'snowy';
+const isBadWeather = (
+  weather: WeatherType | undefined,
+  precipitationProbability: number | undefined,
+  windSpeed: number | undefined,
+): boolean => {
+  if (weather === 'rainy' || weather === 'stormy' || weather === 'snowy') return true;
+  if (precipitationProbability !== undefined && precipitationProbability >= 50) return true;
+  if (windSpeed !== undefined && windSpeed >= 15) return true;
+  return false;
 };
 
 const getDaysUntil = (dateStr: string): number => {
@@ -72,10 +102,12 @@ export const useTripStore = create<TripStore>((set, get) => ({
   plans: initialPlans,
   selectedCity: null,
   editingItem: null,
+  editingWeather: null,
   showSplitModal: false,
   showPlanModal: false,
   showVisaModal: false,
   showPackingModal: false,
+  showWeatherModal: false,
 
   get currentPlan() {
     return get().plans.find(p => p.id === get().currentPlanId);
@@ -199,7 +231,11 @@ export const useTripStore = create<TripStore>((set, get) => ({
 
   setEditingItem: (item) => set({ editingItem: item }),
 
+  setEditingWeather: (weather) => set({ editingWeather: weather }),
+
   setShowSplitModal: (show) => set({ showSplitModal: show }),
+
+  setShowWeatherModal: (show) => set({ showWeatherModal: show }),
 
   setShowPlanModal: (show) => set({ showPlanModal: show }),
 
@@ -766,13 +802,22 @@ export const useTripStore = create<TripStore>((set, get) => ({
 
   getWeatherRiskLevel: (item) => {
     const weather = get().getWeatherForDate(item.startDate, item.city);
-    return calculateWeatherRisk(weather?.weather, item.isOutdoor);
+    return calculateWeatherRisk(
+      weather?.weather,
+      weather?.precipitationProbability,
+      weather?.windSpeed,
+      item.isOutdoor,
+    );
   },
 
   isWeatherAffected: (item) => {
     if (!item.isOutdoor) return false;
     const weather = get().getWeatherForDate(item.startDate, item.city);
-    return isBadWeather(weather?.weather);
+    return isBadWeather(
+      weather?.weather,
+      weather?.precipitationProbability,
+      weather?.windSpeed,
+    );
   },
 
   activateBackupPlan: (itemId, backupId) => {

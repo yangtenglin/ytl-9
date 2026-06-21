@@ -8,6 +8,7 @@ import { useTripStore } from '@/store/useTripStore';
 import { ItemCard } from './ItemCard';
 import { cn } from '@/lib/utils';
 import { WEATHER_ICONS, WEATHER_LABELS, WEATHER_RISK_COLORS, WEATHER_RISK_LABELS } from '@/types';
+import type { DailyWeather } from '@/types';
 
 interface DayColumnProps {
   date: string;
@@ -17,7 +18,8 @@ interface DayColumnProps {
 const tapeStyles = ['tape-decoration', 'tape-decoration-alt', 'tape-decoration-green'];
 
 export const DayColumn: React.FC<DayColumnProps> = ({ date, index }) => {
-  const { getItemsByDate, addItem, currentPlan, selectedCity, getWeatherForDate, getWeatherRiskLevel, isWeatherAffected } = useTripStore();
+  const currentPlan = useTripStore(state => state.plans.find(p => p.id === state.currentPlanId));
+  const { getItemsByDate, addItem, selectedCity, getWeatherForDate, getWeatherRiskLevel, isWeatherAffected, setEditingWeather, setShowWeatherModal } = useTripStore();
   const items = getItemsByDate(date);
 
   const filteredItems = selectedCity
@@ -40,14 +42,38 @@ export const DayColumn: React.FC<DayColumnProps> = ({ date, index }) => {
   const uniqueCities = [...new Set(items.map(i => i.city))];
   const weatherByCity = uniqueCities.map(city => ({
     city,
-    weather: getWeatherForDate(date, city),
+    weather: currentPlan?.dailyWeather.find(w => w.date === date && w.city === city),
   }));
 
-  const hasWeatherRisk = items.some(item => isWeatherAffected(item));
+  const hasWeatherRisk = items.some(item => {
+    if (!item.isOutdoor) return false;
+    const weather = currentPlan?.dailyWeather.find(w => w.date === item.startDate && w.city === item.city);
+    if (!weather) return false;
+    if (weather.weather === 'rainy' || weather.weather === 'stormy' || weather.weather === 'snowy') return true;
+    if (weather.precipitationProbability !== undefined && weather.precipitationProbability >= 50) return true;
+    if (weather.windSpeed !== undefined && weather.windSpeed >= 15) return true;
+    return false;
+  });
+
   const maxRiskLevel = items.reduce((max, item) => {
-    const level = getWeatherRiskLevel(item);
-    if (level === 'danger') return 'danger';
-    if (level === 'caution' && max !== 'danger') return 'caution';
+    if (!item.isOutdoor) return max;
+    const weather = currentPlan?.dailyWeather.find(w => w.date === item.startDate && w.city === item.city);
+    if (!weather) return max;
+    
+    const risks: ('safe' | 'caution' | 'danger')[] = [];
+    if (weather.weather === 'stormy') risks.push('danger');
+    else if (weather.weather === 'rainy' || weather.weather === 'snowy') risks.push('caution');
+    if (weather.precipitationProbability !== undefined) {
+      if (weather.precipitationProbability >= 80) risks.push('danger');
+      else if (weather.precipitationProbability >= 50) risks.push('caution');
+    }
+    if (weather.windSpeed !== undefined) {
+      if (weather.windSpeed >= 25) risks.push('danger');
+      else if (weather.windSpeed >= 15) risks.push('caution');
+    }
+    
+    if (risks.includes('danger')) return 'danger';
+    if (risks.includes('caution') && max !== 'danger') return 'caution';
     return max;
   }, 'safe' as 'safe' | 'caution' | 'danger');
 
@@ -66,6 +92,11 @@ export const DayColumn: React.FC<DayColumnProps> = ({ date, index }) => {
       activeBackupId: null,
     };
     addItem(defaultItem);
+  };
+
+  const handleEditWeather = (weather: DailyWeather) => {
+    setEditingWeather(weather);
+    setShowWeatherModal(true);
   };
 
   const tapeClass = tapeStyles[index % tapeStyles.length];
@@ -89,12 +120,14 @@ export const DayColumn: React.FC<DayColumnProps> = ({ date, index }) => {
           {weatherByCity.length > 0 && (
             <div className="flex flex-wrap items-center justify-center gap-2 mt-1.5 mb-1.5">
               {weatherByCity.map(({ city, weather }) => weather && (
-                <div
+                <button
                   key={city}
-                  className="flex items-center gap-1 text-xs bg-paper-50/80 rounded-full px-2 py-0.5 border border-ink-200"
+                  onClick={() => handleEditWeather(weather)}
+                  className="flex items-center gap-1 text-xs bg-paper-50/80 rounded-full px-2 py-0.5 border border-ink-200 hover:border-ink-400 hover:bg-paper-100 transition-all cursor-pointer group"
+                  title="点击编辑天气"
                 >
                   <span>{city}</span>
-                  <span className="text-base leading-none">{WEATHER_ICONS[weather.weather]}</span>
+                  <span className="text-base leading-none group-hover:scale-110 transition-transform">{WEATHER_ICONS[weather.weather]}</span>
                   <span className="text-ink-600">{weather.temperatureLow}°~{weather.temperatureHigh}°</span>
                   {weather.precipitationProbability > 50 && (
                     <span className="flex items-center gap-0.5 text-blue-600">
@@ -102,7 +135,7 @@ export const DayColumn: React.FC<DayColumnProps> = ({ date, index }) => {
                       {weather.precipitationProbability}%
                     </span>
                   )}
-                </div>
+                </button>
               ))}
             </div>
           )}

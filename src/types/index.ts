@@ -143,10 +143,12 @@ export interface TripStore {
   plans: TripPlan[];
   selectedCity: string | null;
   editingItem: TripItem | null;
+  editingWeather: DailyWeather | null;
   showSplitModal: boolean;
   showPlanModal: boolean;
   showVisaModal: boolean;
   showPackingModal: boolean;
+  showWeatherModal: boolean;
   currentPlan: TripPlan | undefined;
   totalSpent: number;
   isOverBudget: boolean;
@@ -183,10 +185,12 @@ export interface TripStore {
   setCurrentPlanId: (id: string | null) => void;
   setSelectedCity: (city: string | null) => void;
   setEditingItem: (item: TripItem | null) => void;
+  setEditingWeather: (weather: DailyWeather | null) => void;
   setShowSplitModal: (show: boolean) => void;
   setShowPlanModal: (show: boolean) => void;
   setShowVisaModal: (show: boolean) => void;
   setShowPackingModal: (show: boolean) => void;
+  setShowWeatherModal: (show: boolean) => void;
   createPlan: (name: string, budget: number) => void;
   deletePlan: (id: string) => void;
   updatePlan: (id: string, updates: Partial<TripPlan>) => void;
