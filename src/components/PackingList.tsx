@@ -51,18 +51,19 @@ const BAG_SLOT_ICONS: Record<BagSlot, React.ReactNode> = {
 interface ItemFormProps {
   groups: PackingGroup[];
   initial?: PackingItem;
+  prefillGroupId?: string;
   onSubmit: (data: Omit<PackingItem, 'id' | 'sortOrder'>) => void;
   onCancel: () => void;
 }
 
-const ItemForm: React.FC<ItemFormProps> = ({ groups, initial, onSubmit, onCancel }) => {
+const ItemForm: React.FC<ItemFormProps> = ({ groups, initial, prefillGroupId, onSubmit, onCancel }) => {
   const [form, setForm] = useState({
     name: initial?.name || '',
     quantity: initial?.quantity ?? 1,
     weight: initial?.weight ?? 100,
     unit: initial?.unit || 'g' as const,
     priority: initial?.priority || 'important' as PriorityLevel,
-    groupId: initial?.groupId || groups[0]?.id || '',
+    groupId: initial?.groupId || prefillGroupId || groups[0]?.id || '',
     bagSlot: (initial?.bagSlot || 'checked') as BagSlot,
     note: initial?.note || '',
   });
@@ -952,8 +953,6 @@ export const PackingList: React.FC = () => {
     );
   }
 
-  const itemsWithPrefill = editingItem || (prefillGroupId ? { ...editingItem, groupId: prefillGroupId } as PackingItem : null);
-
   return (
     <div className="fixed inset-0 bg-ink-700/50 flex items-center justify-center z-50 p-4">
       <div className="relative card-paper w-full max-w-4xl max-h-[90vh] flex flex-col animate-fade-in-up">
@@ -1255,7 +1254,8 @@ export const PackingList: React.FC = () => {
               </h3>
               <ItemForm
                 groups={packingList.groups}
-                initial={itemsWithPrefill || undefined}
+                initial={editingItem || undefined}
+                prefillGroupId={prefillGroupId || undefined}
                 onSubmit={(data) => {
                   if (editingItem) {
                     updatePackingItem(editingItem.id, data);
