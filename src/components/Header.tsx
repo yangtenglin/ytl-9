@@ -23,6 +23,8 @@ export const Header: React.FC = () => {
       isOutdoor: true,
       backupPlans: [],
       activeBackupId: null,
+      splitMode: 'equal',
+      splitAmounts: {},
     });
   };
 

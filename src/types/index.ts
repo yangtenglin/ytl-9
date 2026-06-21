@@ -124,6 +124,8 @@ export interface TripItem {
   isOutdoor: boolean;
   backupPlans: BackupPlan[];
   activeBackupId: string | null;
+  splitMode: 'equal' | 'custom';
+  splitAmounts: Record<string, number>;
 }
 
 export interface TripPlan {

@@ -7,6 +7,24 @@ export const SplitModal: React.FC = () => {
   const { editingItem, setShowSplitModal, updateItem } = useTripStore();
   const [customAmounts, setCustomAmounts] = React.useState<Record<string, number>>({});
   const [splitMode, setSplitMode] = React.useState<'equal' | 'custom'>('equal');
+  const [initialized, setInitialized] = React.useState(false);
+
+  React.useEffect(() => {
+    if (!editingItem || initialized) return;
+    setSplitMode(editingItem.splitMode ?? 'equal');
+    if (editingItem.splitMode === 'custom' && editingItem.splitAmounts) {
+      setCustomAmounts({ ...editingItem.splitAmounts });
+    }
+    setInitialized(true);
+  }, [editingItem, initialized]);
+
+  React.useEffect(() => {
+    if (!editingItem) return;
+    if (!initialized) return;
+    if (splitMode === 'equal') {
+      handleEqualSplit();
+    }
+  }, [splitMode, editingItem?.participants.length, editingItem?.cost, initialized]);
 
   if (!editingItem) return null;
 
@@ -22,12 +40,6 @@ export const SplitModal: React.FC = () => {
     setCustomAmounts(amounts);
   };
 
-  React.useEffect(() => {
-    if (splitMode === 'equal') {
-      handleEqualSplit();
-    }
-  }, [splitMode, participants.length, totalCost]);
-
   const handleAmountChange = (name: string, value: string) => {
     const num = parseFloat(value) || 0;
     setCustomAmounts(prev => ({ ...prev, [name]: num }));
@@ -38,8 +50,15 @@ export const SplitModal: React.FC = () => {
   };
 
   const handleSave = () => {
+    if (!editingItem) return;
+
     if (splitMode === 'equal') {
+      updateItem(editingItem.id, {
+        splitMode: 'equal',
+        splitAmounts: {},
+      });
       setShowSplitModal(false);
+      setInitialized(false);
       return;
     }
 
@@ -49,7 +68,17 @@ export const SplitModal: React.FC = () => {
       return;
     }
 
+    const validAmounts: Record<string, number> = {};
+    participants.forEach(p => {
+      validAmounts[p] = customAmounts[p] ?? 0;
+    });
+
+    updateItem(editingItem.id, {
+      splitMode: 'custom',
+      splitAmounts: validAmounts,
+    });
     setShowSplitModal(false);
+    setInitialized(false);
   };
 
   const totalCustom = getTotalCustom();
@@ -61,7 +90,10 @@ export const SplitModal: React.FC = () => {
         <div className="tape-decoration-alt" />
 
         <button
-          onClick={() => setShowSplitModal(false)}
+          onClick={() => {
+            setShowSplitModal(false);
+            setInitialized(false);
+          }}
           className="absolute top-4 right-4 p-2 rounded-full hover:bg-paper-200 transition-colors text-ink-500 hover:text-ink-700"
         >
           <X size={20} />
@@ -127,7 +159,7 @@ export const SplitModal: React.FC = () => {
                   <span className="text-ink-400">¥</span>
                   <input
                     type="number"
-                    value={customAmounts[name] || ''}
+                    value={customAmounts[name] ?? ''}
                     onChange={(e) => handleAmountChange(name, e.target.value)}
                     className="w-20 px-2 py-1 rounded-lg border-2 border-ink-500/20 bg-paper-50 focus:border-ink-500 focus:outline-none transition-colors font-mono text-right"
                     placeholder="0"
@@ -166,7 +198,10 @@ export const SplitModal: React.FC = () => {
 
         <div className="flex gap-3 mt-6">
           <button
-            onClick={() => setShowSplitModal(false)}
+            onClick={() => {
+              setShowSplitModal(false);
+              setInitialized(false);
+            }}
             className="flex-1 btn-secondary"
           >
             取消

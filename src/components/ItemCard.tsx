@@ -12,7 +12,7 @@ import {
   WEATHER_ICONS,
 } from '@/types';
 import { formatShortDate, isCrossDay, getDaysDiff } from '@/utils/dateUtils';
-import { formatCurrency } from '@/utils/costUtils';
+import { formatCurrency, isCustomSplit } from '@/utils/costUtils';
 import { useTripStore } from '@/store/useTripStore';
 import { cn } from '@/lib/utils';
 
@@ -65,6 +65,7 @@ export const ItemCard: React.FC<ItemCardProps> = ({ item, index }) => {
   const daysCount = getDaysDiff(item.startDate, item.endDate);
   const perPerson = getPerPersonCost(item);
   const hasSplit = item.participants.length > 1;
+  const customSplit = isCustomSplit(item);
 
   const isFiltered = selectedCity && item.city !== selectedCity;
 
@@ -264,7 +265,12 @@ export const ItemCard: React.FC<ItemCardProps> = ({ item, index }) => {
               {hasSplit && (
                 <span className="flex items-center gap-1 text-xs text-ink-500">
                   <Users size={12} />
-                  {item.participants.length}人 · 人均{formatCurrency(perPerson)}
+                  {item.participants.length}人 · 
+                  {customSplit ? (
+                    <span className="text-tape-orange font-medium">自定义分摊</span>
+                  ) : (
+                    <span>人均{formatCurrency(perPerson)}</span>
+                  )}
                 </span>
               )}
             </div>

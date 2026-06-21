@@ -90,6 +90,8 @@ export const DayColumn: React.FC<DayColumnProps> = ({ date, index }) => {
       isOutdoor: true,
       backupPlans: [],
       activeBackupId: null,
+      splitMode: 'equal' as const,
+      splitAmounts: {},
     };
     addItem(defaultItem);
   };

@@ -42,6 +42,8 @@ const storedPlans = rawStoredPlans.map(plan => ({
       reason: bp.reason ?? '',
     })),
     activeBackupId: item.activeBackupId ?? null,
+    splitMode: item.splitMode ?? 'equal',
+    splitAmounts: item.splitAmounts ?? {},
   })) ?? [],
 }));
 
@@ -295,6 +297,8 @@ export const useTripStore = create<TripStore>((set, get) => ({
       ...item,
       id: generateId(),
       sortOrder: Date.now(),
+      splitMode: item.splitMode ?? 'equal',
+      splitAmounts: item.splitAmounts ?? {},
     };
 
     set((s) => ({
@@ -502,6 +506,8 @@ export const useTripStore = create<TripStore>((set, get) => ({
       plan.items = plan.items.map(item => ({
         ...item,
         id: generateId(),
+        splitMode: item.splitMode ?? 'equal',
+        splitAmounts: item.splitAmounts ?? {},
       }));
       plan.visaDocuments = (plan.visaDocuments || []).map(doc => ({
         ...doc,

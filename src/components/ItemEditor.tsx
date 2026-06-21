@@ -4,7 +4,7 @@ import { useTripStore } from '@/store/useTripStore';
 import type { TripItem, ItemType, BackupPlan } from '@/types';
 import { ITEM_TYPE_LABELS, BACKUP_PLAN_STATUS_LABELS, BACKUP_PLAN_STATUS_COLORS } from '@/types';
 import { formatDate } from '@/utils/dateUtils';
-import { formatCurrency } from '@/utils/costUtils';
+import { formatCurrency, isCustomSplit } from '@/utils/costUtils';
 import { generateId } from '@/utils/dateUtils';
 
 interface ItemEditorProps {
@@ -150,6 +150,8 @@ export const ItemEditor: React.FC<ItemEditorProps> = ({ item, onClose }) => {
       isOutdoor: formData.isOutdoor,
       backupPlans: validBackupPlans,
       activeBackupId: newActiveBackupId,
+      splitMode: item.splitMode,
+      splitAmounts: item.splitAmounts,
     });
     onClose();
   };
@@ -157,6 +159,8 @@ export const ItemEditor: React.FC<ItemEditorProps> = ({ item, onClose }) => {
   const perPerson = formData.participants.length > 0
     ? (parseFloat(formData.cost) || 0) / formData.participants.length
     : 0;
+
+  const customSplitActive = isCustomSplit(item);
 
   return (
     <div className="fixed inset-0 bg-ink-700/50 flex items-center justify-center z-50 p-4">
@@ -324,12 +328,17 @@ export const ItemEditor: React.FC<ItemEditorProps> = ({ item, onClose }) => {
             {formData.participants.length > 0 && (
               <div className="text-xs text-ink-500 mt-1 flex items-center gap-2">
                 <Users size={12} />
-                {formData.participants.length} 人分摊 · 人均 ¥{perPerson.toFixed(2)}
+                {formData.participants.length} 人分摊 · 
+                {customSplitActive ? (
+                  <span className="text-tape-orange font-medium">自定义分摊</span>
+                ) : (
+                  <span>人均 {formatCurrency(perPerson)}</span>
+                )}
                 <button
                   onClick={() => setShowSplitModal(true)}
                   className="ml-auto text-tape-orange hover:underline"
                 >
-                  调整分摊
+                  {customSplitActive ? '修改分摊' : '调整分摊'}
                 </button>
               </div>
             )}

@@ -195,6 +195,8 @@ export const mockPlan: TripPlan = {
       isOutdoor: false,
       backupPlans: [],
       activeBackupId: null,
+      splitMode: 'equal',
+      splitAmounts: {},
     },
     {
       id: id2,
@@ -210,6 +212,8 @@ export const mockPlan: TripPlan = {
       isOutdoor: false,
       backupPlans: [],
       activeBackupId: null,
+      splitMode: 'equal',
+      splitAmounts: {},
     },
     {
       id: id3,
@@ -244,6 +248,8 @@ export const mockPlan: TripPlan = {
         },
       ],
       activeBackupId: null,
+      splitMode: 'equal',
+      splitAmounts: {},
     },
     {
       id: id4,
@@ -278,6 +284,8 @@ export const mockPlan: TripPlan = {
         },
       ],
       activeBackupId: null,
+      splitMode: 'equal',
+      splitAmounts: {},
     },
     {
       id: id5,
@@ -293,6 +301,8 @@ export const mockPlan: TripPlan = {
       isOutdoor: false,
       backupPlans: [],
       activeBackupId: null,
+      splitMode: 'equal',
+      splitAmounts: {},
     },
     {
       id: id6,
@@ -327,6 +337,8 @@ export const mockPlan: TripPlan = {
         },
       ],
       activeBackupId: null,
+      splitMode: 'equal',
+      splitAmounts: {},
     },
     {
       id: id7,
@@ -342,6 +354,8 @@ export const mockPlan: TripPlan = {
       isOutdoor: false,
       backupPlans: [],
       activeBackupId: null,
+      splitMode: 'equal',
+      splitAmounts: {},
     },
     {
       id: id8,
@@ -376,6 +390,8 @@ export const mockPlan: TripPlan = {
         },
       ],
       activeBackupId: null,
+      splitMode: 'equal',
+      splitAmounts: {},
     },
     {
       id: id9,
@@ -391,6 +407,8 @@ export const mockPlan: TripPlan = {
       isOutdoor: false,
       backupPlans: [],
       activeBackupId: null,
+      splitMode: 'equal',
+      splitAmounts: {},
     },
     {
       id: id10,
@@ -406,6 +424,8 @@ export const mockPlan: TripPlan = {
       isOutdoor: false,
       backupPlans: [],
       activeBackupId: null,
+      splitMode: 'equal',
+      splitAmounts: {},
     },
     {
       id: id11,
@@ -440,6 +460,8 @@ export const mockPlan: TripPlan = {
         },
       ],
       activeBackupId: null,
+      splitMode: 'equal',
+      splitAmounts: {},
     },
     {
       id: generateId(),
@@ -455,6 +477,8 @@ export const mockPlan: TripPlan = {
       isOutdoor: false,
       backupPlans: [],
       activeBackupId: null,
+      splitMode: 'equal',
+      splitAmounts: {},
     },
   ],
   packingLists: [],
