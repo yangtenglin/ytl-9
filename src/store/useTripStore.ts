@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import type { TripStore, TripItem, TripPlan, VisaDocument, ExpiryAlertLevel } from '@/types';
+import type { TripStore, TripItem, TripPlan, VisaDocument, ExpiryAlertLevel, PackingList, PackingItem, PriorityLevel } from '@/types';
 import { generateId, getDateRange, isSameDate } from '@/utils/dateUtils';
 import {
   calculateTotal,
@@ -9,7 +9,7 @@ import {
   getPerPersonCost,
 } from '@/utils/costUtils';
 import { loadFromStorage, saveToStorage, downloadJSON } from '@/utils/storageUtils';
-import { getInitialPlans, getInitialPlanId } from '@/data/mockData';
+import { getInitialPlans, getInitialPlanId, createInitialPackingList } from '@/data/mockData';
 
 const rawStoredPlans = loadFromStorage<TripPlan[]>('plans', []);
 const storedCurrentPlanId = loadFromStorage<string | null>('currentPlanId', null);
@@ -17,6 +17,7 @@ const storedCurrentPlanId = loadFromStorage<string | null>('currentPlanId', null
 const storedPlans = rawStoredPlans.map(plan => ({
   ...plan,
   visaDocuments: plan.visaDocuments ?? [],
+  packingLists: plan.packingLists ?? [],
 }));
 
 const initialPlans = storedPlans.length > 0 ? storedPlans : getInitialPlans();
@@ -38,6 +39,7 @@ export const useTripStore = create<TripStore>((set, get) => ({
   showSplitModal: false,
   showPlanModal: false,
   showVisaModal: false,
+  showPackingModal: false,
 
   get currentPlan() {
     return get().plans.find(p => p.id === get().currentPlanId);
@@ -124,6 +126,24 @@ export const useTripStore = create<TripStore>((set, get) => ({
     };
   },
 
+  get packingStats() {
+    const plan = get().currentPlan;
+    if (!plan || !plan.packingLists || plan.packingLists.length === 0) {
+      return { totalItems: 0, packedItems: 0, totalWeight: 0, maxWeight: 0, isOverWeight: false, weightPercent: 0, mustUnpacked: 0 };
+    }
+    const packingList = plan.packingLists[0];
+    const items = packingList.items;
+    const totalItems = items.length;
+    const packedItems = items.filter(i => i.packed).length;
+    const convertToGrams = (w: number, unit: 'g' | 'kg') => unit === 'kg' ? w * 1000 : w;
+    const totalWeight = items.reduce((sum, i) => sum + convertToGrams(i.weight * i.quantity, i.unit), 0);
+    const maxWeight = convertToGrams(packingList.maxWeight, packingList.maxWeightUnit);
+    const isOverWeight = totalWeight > maxWeight;
+    const weightPercent = maxWeight > 0 ? Math.min(100, (totalWeight / maxWeight) * 100) : 0;
+    const mustUnpacked = items.filter(i => i.priority === 'must' && !i.packed).length;
+    return { totalItems, packedItems, totalWeight, maxWeight, isOverWeight, weightPercent, mustUnpacked };
+  },
+
   setCurrentPlanId: (id) => {
     set({ currentPlanId: id });
     saveToStorage('currentPlanId', id);
@@ -139,6 +159,8 @@ export const useTripStore = create<TripStore>((set, get) => ({
 
   setShowVisaModal: (show) => set({ showVisaModal: show }),
 
+  setShowPackingModal: (show) => set({ showPackingModal: show }),
+
   createPlan: (name, budget) => {
     const newPlan: TripPlan = {
       id: generateId(),
@@ -146,6 +168,7 @@ export const useTripStore = create<TripStore>((set, get) => ({
       totalBudget: budget,
       items: [],
       visaDocuments: [],
+      packingLists: [],
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
     };
@@ -401,6 +424,12 @@ export const useTripStore = create<TripStore>((set, get) => ({
         ...doc,
         id: generateId(),
       }));
+      plan.packingLists = (plan.packingLists || []).map(pl => ({
+        ...pl,
+        id: generateId(),
+        groups: pl.groups.map(g => ({ ...g, id: generateId() })),
+        items: pl.items.map(it => ({ ...it, id: generateId() })),
+      }));
       set((state) => ({
         plans: [...state.plans, plan],
         currentPlanId: plan.id,
@@ -421,4 +450,235 @@ export const useTripStore = create<TripStore>((set, get) => ({
   },
 
   getPerPersonCost: (item) => getPerPersonCost(item),
+
+  getCurrentPackingList: () => {
+    const plan = get().currentPlan;
+    if (!plan || !plan.packingLists || plan.packingLists.length === 0) return null;
+    return plan.packingLists[0];
+  },
+
+  createPackingList: (name, maxWeight, maxWeightUnit) => {
+    const state = get();
+    if (!state.currentPlanId) return;
+    const newPackingList = createInitialPackingList(state.currentPlanId, name, maxWeight, maxWeightUnit);
+    set((s) => ({
+      plans: s.plans.map(p =>
+        p.id === s.currentPlanId
+          ? { ...p, packingLists: [newPackingList], updatedAt: new Date().toISOString() }
+          : p
+      ),
+    }));
+    saveToStorage('plans', get().plans);
+  },
+
+  updatePackingList: (updates) => {
+    const state = get();
+    if (!state.currentPlanId) return;
+    set((s) => ({
+      plans: s.plans.map(p =>
+        p.id === s.currentPlanId && p.packingLists && p.packingLists.length > 0
+          ? {
+              ...p,
+              packingLists: [
+                {
+                  ...p.packingLists[0],
+                  ...updates,
+                  updatedAt: new Date().toISOString(),
+                },
+              ],
+              updatedAt: new Date().toISOString(),
+            }
+          : p
+      ),
+    }));
+    saveToStorage('plans', get().plans);
+  },
+
+  addPackingGroup: (name, color) => {
+    const state = get();
+    if (!state.currentPlanId) return;
+    const plan = state.currentPlan;
+    if (!plan) return;
+
+    if (!plan.packingLists || plan.packingLists.length === 0) {
+      state.createPackingList('行李清单', 20, 'kg');
+    }
+
+    set((s) => ({
+      plans: s.plans.map(p => {
+        if (p.id !== s.currentPlanId || !p.packingLists || p.packingLists.length === 0) return p;
+        const pl = p.packingLists[0];
+        const newGroup = {
+          id: generateId(),
+          name,
+          color: color || 'tape-blue',
+          sortOrder: pl.groups.length,
+        };
+        return {
+          ...p,
+          packingLists: [
+            {
+              ...pl,
+              groups: [...pl.groups, newGroup],
+              updatedAt: new Date().toISOString(),
+            },
+          ],
+          updatedAt: new Date().toISOString(),
+        };
+      }),
+    }));
+    saveToStorage('plans', get().plans);
+  },
+
+  updatePackingGroup: (id, updates) => {
+    const state = get();
+    if (!state.currentPlanId) return;
+    set((s) => ({
+      plans: s.plans.map(p => {
+        if (p.id !== s.currentPlanId || !p.packingLists || p.packingLists.length === 0) return p;
+        const pl = p.packingLists[0];
+        return {
+          ...p,
+          packingLists: [
+            {
+              ...pl,
+              groups: pl.groups.map(g => g.id === id ? { ...g, ...updates } : g),
+              updatedAt: new Date().toISOString(),
+            },
+          ],
+          updatedAt: new Date().toISOString(),
+        };
+      }),
+    }));
+    saveToStorage('plans', get().plans);
+  },
+
+  deletePackingGroup: (id) => {
+    const state = get();
+    if (!state.currentPlanId) return;
+    set((s) => ({
+      plans: s.plans.map(p => {
+        if (p.id !== s.currentPlanId || !p.packingLists || p.packingLists.length === 0) return p;
+        const pl = p.packingLists[0];
+        return {
+          ...p,
+          packingLists: [
+            {
+              ...pl,
+              groups: pl.groups.filter(g => g.id !== id),
+              items: pl.items.filter(i => i.groupId !== id),
+              updatedAt: new Date().toISOString(),
+            },
+          ],
+          updatedAt: new Date().toISOString(),
+        };
+      }),
+    }));
+    saveToStorage('plans', get().plans);
+  },
+
+  addPackingItem: (item) => {
+    const state = get();
+    if (!state.currentPlanId) return;
+    const plan = state.currentPlan;
+    if (!plan) return;
+
+    if (!plan.packingLists || plan.packingLists.length === 0) {
+      state.createPackingList('行李清单', 20, 'kg');
+    }
+
+    set((s) => ({
+      plans: s.plans.map(p => {
+        if (p.id !== s.currentPlanId || !p.packingLists || p.packingLists.length === 0) return p;
+        const pl = p.packingLists[0];
+        const newItem: PackingItem = {
+          ...item,
+          id: generateId(),
+          sortOrder: pl.items.length,
+        };
+        return {
+          ...p,
+          packingLists: [
+            {
+              ...pl,
+              items: [...pl.items, newItem],
+              updatedAt: new Date().toISOString(),
+            },
+          ],
+          updatedAt: new Date().toISOString(),
+        };
+      }),
+    }));
+    saveToStorage('plans', get().plans);
+  },
+
+  updatePackingItem: (id, updates) => {
+    const state = get();
+    if (!state.currentPlanId) return;
+    set((s) => ({
+      plans: s.plans.map(p => {
+        if (p.id !== s.currentPlanId || !p.packingLists || p.packingLists.length === 0) return p;
+        const pl = p.packingLists[0];
+        return {
+          ...p,
+          packingLists: [
+            {
+              ...pl,
+              items: pl.items.map(i => i.id === id ? { ...i, ...updates } : i),
+              updatedAt: new Date().toISOString(),
+            },
+          ],
+          updatedAt: new Date().toISOString(),
+        };
+      }),
+    }));
+    saveToStorage('plans', get().plans);
+  },
+
+  deletePackingItem: (id) => {
+    const state = get();
+    if (!state.currentPlanId) return;
+    set((s) => ({
+      plans: s.plans.map(p => {
+        if (p.id !== s.currentPlanId || !p.packingLists || p.packingLists.length === 0) return p;
+        const pl = p.packingLists[0];
+        return {
+          ...p,
+          packingLists: [
+            {
+              ...pl,
+              items: pl.items.filter(i => i.id !== id),
+              updatedAt: new Date().toISOString(),
+            },
+          ],
+          updatedAt: new Date().toISOString(),
+        };
+      }),
+    }));
+    saveToStorage('plans', get().plans);
+  },
+
+  togglePackingItem: (id) => {
+    const state = get();
+    const plan = state.currentPlan;
+    if (!plan || !plan.packingLists || plan.packingLists.length === 0) return;
+    const item = plan.packingLists[0].items.find(i => i.id === id);
+    if (item) {
+      state.updatePackingItem(id, { packed: !item.packed });
+    }
+  },
+
+  getItemsByGroup: (groupId) => {
+    const plan = get().currentPlan;
+    if (!plan || !plan.packingLists || plan.packingLists.length === 0) return [];
+    return plan.packingLists[0].items
+      .filter(i => i.groupId === groupId)
+      .sort((a, b) => a.sortOrder - b.sortOrder);
+  },
+
+  calculateGroupWeight: (groupId) => {
+    const items = get().getItemsByGroup(groupId);
+    const convertToGrams = (w: number, unit: 'g' | 'kg') => unit === 'kg' ? w * 1000 : w;
+    return items.reduce((sum, i) => sum + convertToGrams(i.weight * i.quantity, i.unit), 0);
+  },
 }));
