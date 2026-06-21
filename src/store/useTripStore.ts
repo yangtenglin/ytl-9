@@ -507,12 +507,25 @@ export const useTripStore = create<TripStore>((set, get) => ({
         ...doc,
         id: generateId(),
       }));
-      plan.packingLists = (plan.packingLists || []).map(pl => ({
-        ...pl,
-        id: generateId(),
-        groups: pl.groups.map(g => ({ ...g, id: generateId() })),
-        items: pl.items.map(it => ({ ...it, id: generateId() })),
-      }));
+      plan.packingLists = (plan.packingLists || []).map(pl => {
+        const groupIdMap = new Map<string, string>();
+        const newGroups = pl.groups.map(g => {
+          const newId = generateId();
+          groupIdMap.set(g.id, newId);
+          return { ...g, id: newId };
+        });
+        const newItems = pl.items.map(it => ({
+          ...it,
+          id: generateId(),
+          groupId: groupIdMap.get(it.groupId) ?? it.groupId,
+        }));
+        return {
+          ...pl,
+          id: generateId(),
+          groups: newGroups,
+          items: newItems,
+        };
+      });
       set((state) => ({
         plans: [...state.plans, plan],
         currentPlanId: plan.id,
